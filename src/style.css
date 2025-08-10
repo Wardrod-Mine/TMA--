@@ -1,0 +1,64 @@
+/* ===== Базовые переменные (будут обновляться из JS по themeParams) ===== */
+:root {
+  --bg: #f3f4f6;       /* светлый фон по умолчанию */
+  --fg: #111827;       /* тёмный текст */
+  --muted: #6b7280;    /* вторичный текст */
+  --accent: #3b82f6;   /* синий (кнопки/линки) */
+  --border: #d1d5db;   /* границы */
+}
+
+/* ===== Сбросы и типографика ===== */
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Контентные блоки ===== */
+header, footer {
+  background: transparent;
+  border-color: var(--border);
+}
+
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ===== Кнопки (на случай, если Tailwind отключишь) ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:active { transform: translateY(1px); }
+
+/* ===== Утилиты ===== */
+.hidden { display: none !important; }
+
+/* ===== Безопасные отступы на мобильных (чёлка/дом-бар) ===== */
+.safe-footer {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+
+/* ===== Тёмная схема на случай запуска вне Telegram ===== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0c10;
+    --fg: #ffffff;
+    --muted: #9ca3af;
+    --border: #1f2937;
+  }
+}
