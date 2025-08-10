@@ -95,3 +95,20 @@
   // Старт
   if (tg) initWebApp();
 })();
+
+const BACKEND_URL = "https://<appname>.onrender.com"; // твой Render URL
+
+// ...внутри initWebApp() после tg.onEvent("mainButtonClicked", ...)
+tg.onEvent("mainButtonClicked", async () => {
+  const payload = { action: "complete", ts: Date.now() };
+  try {
+    await fetch(`${BACKEND_URL}/web-data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) { console.warn("backend error", e); }
+  tg.HapticFeedback.impactOccurred("light");
+  tg.sendData(JSON.stringify(payload));
+});
+
