@@ -241,8 +241,11 @@
       tg?.sendData(JSON.stringify(payload));
 
       // 2) (опционально) параллельно — на ваш бекенд
-      // const BACKEND_URL = "https://<your-render-app>.onrender.com";
-      // await fetch(`${BACKEND_URL}/web-data`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+      const BACKEND_URL = "https://telegram-mini-app-assets.onrender.com";
+      await fetch(`${BACKEND_URL}/web-data`,
+        { method:"POST",
+        headers:{ "Content-Type":"application/json" }, 
+        body: JSON.stringify(payload) });
 
       tg?.HapticFeedback.impactOccurred("light");
       tg?.showAlert?.("Заявка отправлена. Мы свяжемся с вами.");
