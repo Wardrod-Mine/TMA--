@@ -1,36 +1,35 @@
 import { Telegraf } from "telegraf";
 
-const BOT_TOKEN = "8310422634:AAHACKWJd-NWODxeUPwd1o0IHrnnZpOgFv4";                   // токен бота
-const ADMIN_CHAT_IDS = -4754564050
+const BOT_TOKEN = process.env.BOT_TOKEN;
+if (!BOT_TOKEN) throw new Error("BOT_TOKEN is required");
+
+const ADMIN_CHAT_IDS = (process.env.ADMIN_CHAT_IDS || "")
   .split(",").map(s => s.trim()).filter(Boolean);
+if (!ADMIN_CHAT_IDS.length) console.warn("ADMIN_CHAT_IDS is empty – admin notifications disabled");
 
-const bot = new Telegraf(BOT_TOKEN);
+const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 9000 });
 
-// Команда для получения chat_id (в ЛС и в группе)
-bot.command("id", (ctx) => ctx.reply(`chat_id: ${ctx.chat.id}`));
+bot.start(ctx => ctx.reply("Бот запущен. Используй кнопку WebApp или пришли /id, чтобы узнать chat_id."));
+bot.command("id", ctx => ctx.reply(`chat_id: ${ctx.chat.id}`));
 
 bot.on("message", async (ctx) => {
   const data = ctx.message?.web_app_data?.data;
-  if (!data) return;
+  if (!data) return; // игнорим прочие сообщения
 
-  let p;
-  try { p = JSON.parse(data); } catch { return; }
+  let p; try { p = JSON.parse(data); } catch { return; }
 
-  const from = ctx.from;
-  const text = formatLead(p, from);
+  const text = formatLead(p, ctx.from);
 
-  // отправляем всем администраторам/в группу (бот должен быть добавлен в группу!)
-  for (const chatId of ADMIN_CHAT_IDS) {
-    await ctx.telegram.sendMessage(chatId, text, { parse_mode: "HTML", disable_web_page_preview: true });
+  if (ADMIN_CHAT_IDS.length) {
+    await Promise.all(ADMIN_CHAT_IDS.map(chatId =>
+      ctx.telegram.sendMessage(chatId, text, { parse_mode: "HTML", disable_web_page_preview: true })
+    ));
   }
-
-  // подтверждение пользователю
   await ctx.reply("✅ Заявка принята, скоро свяжемся!");
 });
 
 function esc(s=""){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-
-function formatLead(p, from) {
+function formatLead(p, from){
   return [
     `<b>Новая заявка</b>`,
     `Категория: <b>${esc(p.category)}</b>`,
@@ -42,9 +41,11 @@ function formatLead(p, from) {
     p.city ? `Город: <b>${esc(p.city)}</b>` : null,
     p.comment ? `Комментарий: ${esc(p.comment)}` : null,
     ``,
-    `От пользователя: <a href="tg://user?id=${from.id}">${esc(from.username ? '@'+from.username : from.first_name || 'user')}</a>`,
+    `От: <a href="tg://user?id=${from.id}">${esc(from.username ? '@'+from.username : from.first_name || 'user')}</a>`,
     `Время: ${new Date(p.ts || Date.now()).toLocaleString("ru-RU")}`
   ].filter(Boolean).join('\n');
 }
 
-bot.launch();
+bot.launch().then(()=>console.log("Bot launched"));
+process.once("SIGINT", () => bot.stop("SIGINT"));
+process.once("SIGTERM", () => bot.stop("SIGTERM"));

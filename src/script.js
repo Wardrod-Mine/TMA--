@@ -68,7 +68,7 @@
     backBtn.addEventListener("click", () => {
       if (!state.history.length) return;
       const prev = state.history.pop();
-      showScreen(prev);
+      showScreen(prev, /*fromBack*/ true);
     });
     brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
     modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
@@ -89,9 +89,9 @@
   }
 
 
-  function showScreen(name) {
+  function showScreen(name, fromBack = false) {
     // remember current step for back
-    if (state.step && state.step !== name) state.history.push(state.step);
+    if (state.step && state.step !== name && !fromBack) state.history.push(state.step);
     state.step = name;
 
     // toggle
@@ -108,7 +108,13 @@
         sForm.classList.remove("hidden");
         title.textContent = "Заявка";
         updateFormSummary();
-        validateForm();
+        // В Telegram показываем только системный MainButton, внутреннюю кнопку скрываем
+        if (tg) {
+          sendBtn.classList.add("hidden");
+        } else {
+          sendBtn.classList.remove("hidden");
+        }
+        validateForm(); // актуализируем видимость MainButton и состояния
         break;
     }
   }
@@ -198,7 +204,7 @@
         <div class="font-semibold">${srv.title}</div>
         <div class="text-sm opacity-80 mt-1">Стоимость: от ${formatPrice(srv.price_from)} • Время: ${srv.duration || "—"}</div>
         <div class="mt-2">
-          <button class="btn w-full" data-id="${srv.id}">Оставить заявку</button>
+          <button class="btn btn-block" data-id="${srv.id}">Оставить заявку</button>
         </div>
       `;
       el.querySelector("button").addEventListener("click", () => {
@@ -210,7 +216,7 @@
 
     // Позволяем оставить «общую» заявку по категории/модели даже без карточки
     const general = document.createElement("button");
-    general.className = "btn w-full";
+    general.className = "btn btn-block";
     general.textContent = "Оставить общую заявку по этой услуге";
     general.addEventListener("click", () => {
       state.selection.service = {
@@ -282,11 +288,11 @@
     const okPhone = /^\+?\d[\d\s\-()]{7,}$/.test(fPhone.value.trim());
     const valid = okName && okPhone && okLegal;
 
-    // раньше здесь было: sendBtn.disabled = !valid;
-    // Кнопку не блокируем — она всегда кликабельна:
-    if (sendBtn) sendBtn.disabled = false;
-    // Зато системную MainButton показываем только при валидной форме
-    if (tg) tg.MainButton[valid ? "show" : "hide"]();
+    if (!tg) sendBtn.disabled = false;
+    if (tg) {
+      tg.MainButton.setParams({ text: "Отправить заявку" });
+      tg.MainButton[valid ? "show" : "hide"]();
+    }
 
     return valid;
   }
