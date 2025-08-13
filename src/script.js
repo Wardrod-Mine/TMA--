@@ -1,6 +1,8 @@
 (() => {
   const isTg = typeof window.Telegram !== "undefined" && window.Telegram.WebApp;
   const tg = isTg ? window.Telegram.WebApp : null;
+  const BACKEND_URL = "https://telegram-mini-app-assets.onrender.com"
+
 
   // DOM
   const title = document.getElementById("title");
@@ -60,7 +62,7 @@
     renderCategories();
     wireCommon();
   }
-
+  if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
     closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
 
@@ -69,9 +71,14 @@
       const prev = state.history.pop();
       showScreen(prev);
     });
-
     brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
     modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
+
+    // ⬇️ Лайв-валидация: на ввод в полях и переключение чекбокса
+    [fName, fPhone, fCity, fComment].forEach(el => {
+      el.addEventListener("input", validateForm);
+    });
+    if (legalCheckbox) legalCheckbox.addEventListener("change", validateForm);
 
     // ⬇️ НОВОЕ: лайв-валидация формы
     [fName, fPhone, fCity, fComment].forEach(el => {
@@ -227,7 +234,11 @@
 
   // Submit
   async function onSubmit() {
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.\nДля некоторых услуг требуется подтвердить законность.");
+      else alert("Заполните имя и телефон. Для некоторых услуг требуется подтвердить законность.");
+      return;
+    }
 
     const payload = {
       type: "lead",
@@ -248,12 +259,13 @@
       tg?.sendData(JSON.stringify(payload));
 
       // 2) (опционально) параллельно — на ваш бекенд
-      const BACKEND_URL = "https://telegram-mini-app-assets.onrender.com";
-      await fetch(`${BACKEND_URL}/web-data`,
-        { method:"POST",
-        headers:{ "Content-Type":"application/json" }, 
-        body: JSON.stringify(payload) });
-
+      if (BACKEND_URL && BACKEND_URL.startsWith("http")) {
+        await fetch(`${BACKEND_URL}/web-data`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
       tg?.HapticFeedback.impactOccurred("light");
       tg?.showAlert?.("Заявка отправлена. Мы свяжемся с вами.");
     } catch (e) {
@@ -272,7 +284,9 @@
     const valid = okName && okPhone && okLegal;
 
     // раньше здесь было: sendBtn.disabled = !valid;
-    sendBtn.disabled = false;                      // ← всегда кликабельно
+    // Кнопку не блокируем — она всегда кликабельна:
+    if (sendBtn) sendBtn.disabled = false;
+    // Зато системную MainButton показываем только при валидной форме
     if (tg) tg.MainButton[valid ? "show" : "hide"]();
 
     return valid;
