@@ -23,3 +23,7 @@ body{background:var(--bg);color:var(--fg)}
   .inp{background:#111317; border-color:#1f2937}
   .card,.item{background:#111317; border-color:#1f2937}
 }
+.btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}

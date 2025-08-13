@@ -73,8 +73,15 @@
     brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
     modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
 
+    // ⬇️ НОВОЕ: лайв-валидация формы
+    [fName, fPhone, fCity, fComment].forEach(el => {
+      el.addEventListener("input", validateForm);
+    });
+    legalCheckbox?.addEventListener("change", validateForm);
+
     sendBtn.addEventListener("click", onSubmit);
   }
+
 
   function showScreen(name) {
     // remember current step for back
@@ -264,11 +271,13 @@
     const okPhone = /^\+?\d[\d\s\-()]{7,}$/.test(fPhone.value.trim());
     const valid = okName && okPhone && okLegal;
 
-    sendBtn.disabled = !valid;
+    // раньше здесь было: sendBtn.disabled = !valid;
+    sendBtn.disabled = false;                      // ← всегда кликабельно
     if (tg) tg.MainButton[valid ? "show" : "hide"]();
 
     return valid;
   }
+
 
   function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
 
