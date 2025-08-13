@@ -1,7 +1,7 @@
 import { Telegraf } from "telegraf";
 
-const BOT_TOKEN = process.env.BOT_TOKEN;                   // токен бота
-const ADMIN_CHAT_IDS = (process.env.ADMIN_CHAT_IDS || "")  // список ID через запятую
+const BOT_TOKEN = "8310422634:AAHACKWJd-NWODxeUPwd1o0IHrnnZpOgFv4";                   // токен бота
+const ADMIN_CHAT_IDS = -4754564050
   .split(",").map(s => s.trim()).filter(Boolean);
 
 const bot = new Telegraf(BOT_TOKEN);
