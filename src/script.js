@@ -1,114 +1,280 @@
-// ====== Telegram Mini App — базовый стартовый скрипт ======
 (() => {
-  const isTelegramEnv = typeof window.Telegram !== "undefined" && !!window.Telegram.WebApp;
-  const tg = isTelegramEnv ? window.Telegram.WebApp : null;
+  const isTg = typeof window.Telegram !== "undefined" && window.Telegram.WebApp;
+  const tg = isTg ? window.Telegram.WebApp : null;
 
-  // UI-элементы страницы
+  // DOM
+  const title = document.getElementById("title");
+  const userInfo = document.getElementById("userInfo");
+  const backBtn = document.getElementById("backBtn");
   const closeBtn = document.getElementById("closeApp");
-  const appRoot = document.getElementById("app");
 
-  // Локальная проверка (запуск вне Telegram — удобно для GitHub Pages)
-  if (!isTelegramEnv) {
-    console.warn("Запущено вне Telegram. Некоторые функции (MainButton, theme) работать не будут.");
-    // Имитация пользователя для разработки
-    appRoot.insertAdjacentHTML("beforeend", `
-      <div class="mt-4 text-center text-sm opacity-80">
-        <div>Dev mode: Telegram.WebApp не найден.</div>
-        <div>Открой через кнопку в боте, чтобы проверить интеграцию.</div>
-      </div>
-    `);
+  const sCategories = document.getElementById("screen-categories");
+  const sBrands = document.getElementById("screen-brands");
+  const sModels = document.getElementById("screen-models");
+  const sServices = document.getElementById("screen-services");
+  const sForm = document.getElementById("screen-form");
+
+  const brandSearch = document.getElementById("brandSearch");
+  const brandList = document.getElementById("brandList");
+  const modelSearch = document.getElementById("modelSearch");
+  const modelList = document.getElementById("modelList");
+  const serviceCards = document.getElementById("serviceCards");
+  const legalNotice = document.getElementById("legalNotice");
+  const legalCheckbox = document.getElementById("legalCheckbox");
+
+  const fName = document.getElementById("fName");
+  const fPhone = document.getElementById("fPhone");
+  const fCity = document.getElementById("fCity");
+  const fComment = document.getElementById("fComment");
+  const formSummary = document.getElementById("formSummary");
+  const sendBtn = document.getElementById("sendBtn");
+
+  // State
+  const state = {
+    step: "categories",
+    catalog: null,
+    selection: { category: null, brand: null, model: null, service: null },
+    history: []
+  };
+
+  // Init
+  init();
+  async function init() {
+    if (tg) {
+      tg.expand();
+      applyTheme(tg.themeParams || {});
+      tg.onEvent("themeChanged", () => applyTheme(tg.themeParams || {}));
+      const u = tg?.initDataUnsafe?.user;
+      if (u) userInfo.textContent = u.username ? `@${u.username}` : (u.first_name || "");
+      tg.MainButton.setParams({ text: "Отправить заявку", is_visible: false, is_active: true });
+      tg.onEvent("mainButtonClicked", onSubmit);
+    } else {
+      console.warn("Dev mode: Telegram.WebApp не найден");
+      userInfo.textContent = "Dev mode";
+    }
+
+    // Load data
+    const res = await fetch("./data/catalog.json");
+    state.catalog = await res.json();
+
+    renderCategories();
+    wireCommon();
   }
 
-  // ===== Инициализация WebApp =====
-  function initWebApp() {
-    // Растянуть мини-приложение
-    tg.expand();
+  function wireCommon() {
+    closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
 
-    // Включить авто-тему Telegram
-    tg.enableClosingConfirmation(); // защитит от случайного закрытия при незавершённых действиях
-
-    // Синхронизируем цвета с темой Telegram
-    applyThemeFromTelegram();
-
-    // Подписки на события
-    tg.onEvent("themeChanged", applyThemeFromTelegram);
-    tg.onEvent("viewportChanged", ({ isStateStable }) => {
-      // Можно реагировать на изменение высоты, если понадобится
-      // console.log("viewportChanged", isStateStable, tg.viewportHeight, tg.viewportStableHeight);
+    backBtn.addEventListener("click", () => {
+      if (!state.history.length) return;
+      const prev = state.history.pop();
+      showScreen(prev);
     });
 
-    // Настраиваем MainButton (пока «пустое» действие)
-    tg.MainButton.setParams({
-      text: "Готово",
-      is_visible: true,
-      is_active: true
-    });
+    brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
+    modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
 
-    // Клик по MainButton — отправим заготовленный payload боту
-    tg.onEvent("mainButtonClicked", () => {
-      // Отправляем данные в бота (бот получит их в update.callback_query.web_app_data)
-      const payload = {
-        action: "complete",
-        ts: Date.now()
-      };
-      tg.HapticFeedback.impactOccurred("light");
-      tg.sendData(JSON.stringify(payload));
-    });
+    sendBtn.addEventListener("click", onSubmit);
+  }
 
-    // Приветствие с именем пользователя (если есть)
-    const username = tg.initDataUnsafe?.user?.username || tg.initDataUnsafe?.user?.first_name;
-    if (username) {
-      appRoot.insertAdjacentHTML("beforeend", `
-        <p class="mt-4 text-center text-sm">Пользователь: <b>@${username}</b></p>
-      `);
+  function showScreen(name) {
+    // remember current step for back
+    if (state.step && state.step !== name) state.history.push(state.step);
+    state.step = name;
+
+    // toggle
+    [sCategories, sBrands, sModels, sServices, sForm].forEach(el => el.classList.add("hidden"));
+    backBtn.classList.remove("hidden");
+    tg?.MainButton.hide();
+
+    switch (name) {
+      case "categories": backBtn.classList.add("hidden"); sCategories.classList.remove("hidden"); title.textContent = "Услуги"; break;
+      case "brands": sBrands.classList.remove("hidden"); title.textContent = state.selection.category.title; break;
+      case "models": sModels.classList.remove("hidden"); title.textContent = `${state.selection.brand}`; break;
+      case "services": sServices.classList.remove("hidden"); title.textContent = `${state.selection.brand} • ${state.selection.model}`; break;
+      case "form":
+        sForm.classList.remove("hidden");
+        title.textContent = "Заявка";
+        updateFormSummary();
+        validateForm();
+        break;
     }
   }
 
-  // ===== Синхронизация темы (Telegram -> CSS переменные) =====
-  function applyThemeFromTelegram() {
-    const theme = tg?.themeParams || {};
-    // Пробрасываем ключевые цвета в :root
-    const root = document.documentElement;
-    if (theme.bg_color)         root.style.setProperty("--bg", theme.bg_color);
-    if (theme.text_color)       root.style.setProperty("--fg", theme.text_color);
-    if (theme.hint_color)       root.style.setProperty("--muted", theme.hint_color);
-    if (theme.link_color)       root.style.setProperty("--accent", theme.link_color);
-    if (theme.section_separator_color) root.style.setProperty("--border", theme.section_separator_color);
-    // Обновим цвет адресной строки на мобилках
-    try {
-      const m = document.querySelector('meta[name="theme-color"]') || (() => {
-        const meta = document.createElement("meta");
-        meta.setAttribute("name", "theme-color");
-        document.head.appendChild(meta);
-        return meta;
-      })();
-      m.setAttribute("content", getComputedStyle(document.documentElement).getPropertyValue("--bg").trim());
-    } catch {}
+  // Screens
+  function renderCategories() {
+    sCategories.innerHTML = "";
+    state.catalog.categories.forEach(cat => {
+      const el = document.createElement("button");
+      el.className = "card w-full text-left";
+      el.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold">${cat.title}</div>
+            <div class="text-sm opacity-75">${cat.desc || ""}</div>
+          </div>
+          <div class="text-right text-sm opacity-80">от ${formatPrice(cat.from)}</div>
+        </div>
+        ${cat.restricted ? '<div class="mt-2 text-xs text-amber-600 dark:text-amber-300">⚠️ Может иметь юридические ограничения</div>' : ""}
+      `;
+      el.addEventListener("click", () => {
+        state.selection.category = cat;
+        renderBrands();
+        showScreen("brands");
+      });
+      sCategories.appendChild(el);
+    });
+    showScreen("categories");
   }
 
-  // ===== Кнопка Закрыть (в футере) =====
-  closeBtn?.addEventListener("click", () => {
-    if (tg) tg.close();
-    else window.close(); // на случай запуска вне Telegram
-  });
+  function renderBrands(filter = "") {
+    brandList.innerHTML = "";
+    const brands = state.catalog.brands
+      .filter(b => b.toLowerCase().includes(filter.trim().toLowerCase()));
 
-  // Старт
-  if (tg) initWebApp();
-})();
-
-const BACKEND_URL = "https://<appname>.onrender.com"; // твой Render URL
-
-// ...внутри initWebApp() после tg.onEvent("mainButtonClicked", ...)
-tg.onEvent("mainButtonClicked", async () => {
-  const payload = { action: "complete", ts: Date.now() };
-  try {
-    await fetch(`${BACKEND_URL}/web-data`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+    brands.forEach(b => {
+      const el = document.createElement("div");
+      el.className = "item text-center";
+      el.textContent = b;
+      el.addEventListener("click", () => {
+        state.selection.brand = b;
+        renderModels();
+        showScreen("models");
+      });
+      brandList.appendChild(el);
     });
-  } catch (e) { console.warn("backend error", e); }
-  tg.HapticFeedback.impactOccurred("light");
-  tg.sendData(JSON.stringify(payload));
-});
+  }
 
+  function renderModels(filter = "") {
+    modelList.innerHTML = "";
+    const models = state.catalog.models[state.selection.brand] || [];
+    models
+      .filter(m => m.toLowerCase().includes(filter.trim().toLowerCase()))
+      .forEach(m => {
+        const el = document.createElement("div");
+        el.className = "item text-center";
+        el.textContent = m;
+        el.addEventListener("click", () => {
+          state.selection.model = m;
+          renderServices();
+          showScreen("services");
+        });
+        modelList.appendChild(el);
+      });
+  }
+
+  function renderServices() {
+    serviceCards.innerHTML = "";
+    const restrictedCat = !!state.selection.category.restricted;
+    legalNotice.classList.toggle("hidden", !restrictedCat);
+    legalCheckbox.checked = false;
+
+    const list = state.catalog.services.filter(s =>
+      s.category === state.selection.category.code &&
+      s.brand === state.selection.brand &&
+      s.model === state.selection.model
+    );
+
+    if (!list.length) {
+      serviceCards.innerHTML = `<div class="text-sm opacity-70">Пока нет преднастроенных карточек для этой модели. Вы можете всё равно оставить заявку на общую услугу.</div>`;
+    }
+
+    list.forEach(srv => {
+      const el = document.createElement("div");
+      el.className = "card";
+      el.innerHTML = `
+        <div class="font-semibold">${srv.title}</div>
+        <div class="text-sm opacity-80 mt-1">Стоимость: от ${formatPrice(srv.price_from)} • Время: ${srv.duration || "—"}</div>
+        <div class="mt-2">
+          <button class="btn w-full" data-id="${srv.id}">Оставить заявку</button>
+        </div>
+      `;
+      el.querySelector("button").addEventListener("click", () => {
+        state.selection.service = srv;
+        showScreen("form");
+      });
+      serviceCards.appendChild(el);
+    });
+
+    // Позволяем оставить «общую» заявку по категории/модели даже без карточки
+    const general = document.createElement("button");
+    general.className = "btn w-full";
+    general.textContent = "Оставить общую заявку по этой услуге";
+    general.addEventListener("click", () => {
+      state.selection.service = {
+        id: "general",
+        category: state.selection.category.code,
+        brand: state.selection.brand,
+        model: state.selection.model,
+        title: `Заявка: ${state.selection.category.title}`
+      };
+      showScreen("form");
+    });
+    serviceCards.appendChild(general);
+  }
+
+  function updateFormSummary() {
+    const { category, brand, model, service } = state.selection;
+    formSummary.textContent =
+      `${category.title} → ${brand} → ${model} → ${service?.title || "Без названия"}`;
+  }
+
+  // Submit
+  async function onSubmit() {
+    if (!validateForm()) return;
+
+    const payload = {
+      type: "lead",
+      ts: Date.now(),
+      category: state.selection.category.title,
+      brand: state.selection.brand,
+      model: state.selection.model,
+      service: state.selection.service?.title || null,
+      price_from: state.selection.service?.price_from || state.selection.category.from || null,
+      name: fName.value.trim(),
+      phone: fPhone.value.trim(),
+      city: fCity.value.trim(),
+      comment: fComment.value.trim()
+    };
+
+    try {
+      // 1) Отправка в бота
+      tg?.sendData(JSON.stringify(payload));
+
+      // 2) (опционально) параллельно — на ваш бекенд
+      // const BACKEND_URL = "https://<your-render-app>.onrender.com";
+      // await fetch(`${BACKEND_URL}/web-data`, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload) });
+
+      tg?.HapticFeedback.impactOccurred("light");
+      tg?.showAlert?.("Заявка отправлена. Мы свяжемся с вами.");
+    } catch (e) {
+      console.warn("submit error", e);
+      alert("Не удалось отправить заявку. Попробуйте позже.");
+    }
+  }
+
+  // Helpers
+  function validateForm() {
+    const restricted = !!state.selection.category?.restricted;
+    const okLegal = !restricted || legalCheckbox.checked;
+
+    const okName = fName.value.trim().length >= 2;
+    const okPhone = /^\+?\d[\d\s\-()]{7,}$/.test(fPhone.value.trim());
+    const valid = okName && okPhone && okLegal;
+
+    sendBtn.disabled = !valid;
+    if (tg) tg.MainButton[valid ? "show" : "hide"]();
+
+    return valid;
+  }
+
+  function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
+
+  function applyTheme(tp){
+    const root = document.documentElement;
+    if (tp?.bg_color) root.style.setProperty("--bg", tp.bg_color);
+    if (tp?.text_color) root.style.setProperty("--fg", tp.text_color);
+    if (tp?.hint_color) root.style.setProperty("--muted", tp.hint_color);
+    if (tp?.link_color) root.style.setProperty("--accent", tp.link_color);
+    if (tp?.section_separator_color) root.style.setProperty("--border", tp.section_separator_color);
+  }
+})();

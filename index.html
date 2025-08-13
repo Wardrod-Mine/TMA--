@@ -2,33 +2,70 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>Telegram Mini App</title>
-
-  <!-- Tailwind CSS -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>Auto Services — TMA</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Telegram WebApp API -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-  <!-- Наши стили -->
   <link rel="stylesheet" href="./src/style.css" />
 </head>
-<body class="bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white min-h-screen flex flex-col">
-  <header class="p-4 text-center font-bold text-lg border-b border-gray-300 dark:border-gray-700">
-    Telegram Mini App
+<body class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
+  <!-- Header -->
+  <header class="sticky top-0 z-20 bg-white/70 dark:bg-gray-900/70 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+    <div class="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
+      <button id="backBtn" class="px-3 py-1 rounded border border-gray-300 dark:border-gray-700 text-sm hidden">Назад</button>
+      <h1 id="title" class="font-semibold text-lg">Услуги</h1>
+      <div class="ml-auto text-sm opacity-75" id="userInfo"></div>
+    </div>
   </header>
 
-  <main id="app" class="flex-1 p-4">
-    <p class="text-center">Привет! Это пустой шаблон Telegram Mini App 🚀</p>
+  <!-- Screens -->
+  <main class="max-w-3xl mx-auto px-4 py-4">
+    <!-- Categories -->
+    <section id="screen-categories" class="space-y-3"></section>
+
+    <!-- Brands -->
+    <section id="screen-brands" class="space-y-3 hidden">
+      <input id="brandSearch" type="text" placeholder="Поиск марки…" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800" />
+      <div id="brandList" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+    </section>
+
+    <!-- Models -->
+    <section id="screen-models" class="space-y-3 hidden">
+      <input id="modelSearch" type="text" placeholder="Поиск модели…" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800" />
+      <div id="modelList" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+    </section>
+
+    <!-- Services for model -->
+    <section id="screen-services" class="space-y-3 hidden">
+      <div id="legalNotice" class="hidden p-3 rounded border border-amber-400 bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 text-sm">
+        ⚠️ Вы выбрали услугу из категории с юридическими ограничениями. Подтвердите, что используете её законно и в рамках правил вашей юрисдикции.
+        <label class="block mt-2">
+          <input id="legalCheckbox" type="checkbox" class="mr-2">
+          Подтверждаю законность целей и принимаю ответственность.
+        </label>
+      </div>
+      <div id="serviceCards" class="grid gap-3"></div>
+    </section>
+
+    <!-- Lead form -->
+    <section id="screen-form" class="space-y-3 hidden">
+      <div class="grid gap-3">
+        <input id="fName" type="text" placeholder="Имя" class="inp">
+        <input id="fPhone" type="tel" placeholder="Телефон +7…" class="inp">
+        <input id="fCity" type="text" value="Санкт-Петербург" class="inp">
+        <textarea id="fComment" rows="3" placeholder="Комментарий (например, нужен выезд, удобное время)" class="inp"></textarea>
+      </div>
+      <p id="formSummary" class="text-sm opacity-80"></p>
+      <button id="sendBtn" class="btn w-full">Отправить заявку</button>
+    </section>
   </main>
 
-  <footer class="p-4 text-center border-t border-gray-300 dark:border-gray-700">
-    <button id="closeApp" class="bg-blue-500 text-white px-4 py-2 rounded">Закрыть</button>
+  <!-- Footer -->
+  <footer class="max-w-3xl mx-auto px-4 py-4 border-t border-gray-200 dark:border-gray-800">
+    <button id="closeApp" class="px-4 py-2 rounded bg-blue-600 text-white">Закрыть</button>
   </footer>
 
-  <!-- Скрипт -->
   <script src="./src/script.js"></script>
 </body>
 </html>
