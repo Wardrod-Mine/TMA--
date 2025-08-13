@@ -8,6 +8,7 @@
   const userInfo = document.getElementById("userInfo");
   const backBtn = document.getElementById("backBtn");
   const closeBtn = document.getElementById("closeApp");
+  const errorBtn = document.getElementById("errorBtn");
 
   const sCategories = document.getElementById("screen-categories");
   const sBrands = document.getElementById("screen-brands");
@@ -64,6 +65,7 @@
   if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
     closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
+    errorBtn?.addEventListener("click", onReportClick);
 
     backBtn.addEventListener("click", () => {
       if (!state.history.length) return;
@@ -86,6 +88,86 @@
     legalCheckbox?.addEventListener("change", validateForm);
 
     sendBtn.addEventListener("click", onSubmit);
+  }
+  // === ERROR REPORTING ===
+  let lastError = null;
+
+  // Автосбор последних ошибок
+  window.addEventListener("error", (e) => {
+    lastError = {
+      type: "error",
+      message: e.message,
+      source: e.filename,
+      line: e.lineno,
+      column: e.colno,
+      stack: e.error?.stack ? String(e.error.stack).slice(0, 4000) : null
+    };
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    lastError = {
+      type: "unhandledrejection",
+      message: e.reason?.message || String(e.reason),
+      stack: e.reason?.stack ? String(e.reason.stack).slice(0, 4000) : null
+    };
+  });
+
+  function collectDebug(extra = {}) {
+    const u = tg?.initDataUnsafe?.user;
+    return {
+      ts: new Date().toISOString(),
+      url: location.href,
+      appStep: state.step,
+      selection: state.selection,
+      platform: tg?.platform || "web",
+      colorScheme: tg?.colorScheme || null,
+      viewport: { w: innerWidth, h: innerHeight },
+      user: u ? { id: u.id, username: u.username || null, first_name: u.first_name || null } : null,
+      lastError,
+      ...extra
+    };
+  }
+
+  async function postErrorReport(payload) {
+    const initData = tg?.initData || "";
+    const res = await fetch(`${BACKEND_URL}/report-error`, {  // BACKEND_URL уже есть в файле
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": initData
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text().catch(()=>"send failed"));
+  }
+
+  function onReportClick() {
+    const summary = "Отправим: URL, платформу, шаг/выбор, user_id (если есть), и последнюю ошибку (если поймана).";
+    if (tg?.showPopup) {
+      tg.showPopup({
+        title: "Сообщить об ошибке?",
+        message: summary,
+        buttons: [{id:"cancel", type:"close", text:"Отмена"}, {id:"ok", type:"default", text:"Отправить"}]
+      }, async (btnId) => {
+        if (btnId !== "ok") return;
+        await doSend();
+      });
+    } else {
+      if (confirm(summary + "\n\nОтправить отчёт?")) doSend();
+    }
+
+    async function doSend() {
+      try {
+        tg?.HapticFeedback.impactOccurred("light");
+        await postErrorReport({ kind: "error_report", debug: collectDebug() });
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Спасибо! Отчёт отправлен.");
+        lastError = null;
+      } catch (e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось отправить отчёт. Попробуйте позже.");
+      }
+    }
   }
 
 
