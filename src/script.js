@@ -1,10 +1,9 @@
 (() => {
   const isTg = typeof window.Telegram !== "undefined" && window.Telegram.WebApp;
   const tg = isTg ? window.Telegram.WebApp : null;
-  const BACKEND_URL = "https://telegram-mini-app-assets.onrender.com"
+  const BACKEND_URL = "https://tma-den-serv.onrender.com"
 
 
-  // DOM
   const title = document.getElementById("title");
   const userInfo = document.getElementById("userInfo");
   const backBtn = document.getElementById("backBtn");
