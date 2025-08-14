@@ -9,21 +9,27 @@
   const userInfo = document.getElementById("userInfo");
   const backBtn = document.getElementById("backBtn");
   const closeBtn = document.getElementById("closeApp");
+
   const sCategories = document.getElementById("screen-categories");
   const sBrands     = document.getElementById("screen-brands");
   const sModels     = document.getElementById("screen-models");
   const sServices   = document.getElementById("screen-services");
   const sForm       = document.getElementById("screen-form");
+
   const brandSearch = document.getElementById("brandSearch");
   const brandList   = document.getElementById("brandList");
   const modelSearch = document.getElementById("modelSearch");
   const modelList   = document.getElementById("modelList");
   const serviceCards= document.getElementById("serviceCards");
+
+  // форма заявки
   const fName    = document.getElementById("fName");
   const fPhone   = document.getElementById("fPhone");
   const fCity    = document.getElementById("fCity");
   const fComment = document.getElementById("fComment");
   const sendBtn  = document.getElementById("sendBtn");
+
+  // блок «вопрос админу»
   const askText  = document.getElementById("askText");
   const askBtn   = document.getElementById("askBtn");
 
@@ -142,6 +148,11 @@
     sendBtn?.addEventListener("click", onSubmit);
   }
 
+  function updateBackButton() {
+    // скрывать, когда некуда возвращаться
+    backBtn?.classList.toggle("hidden", state.history.length === 0);
+  }
+
   // ===== Screens common =====
   function showScreen(name, fromBack = false) {
     if (state.step && state.step !== name && !fromBack) state.history.push(state.step);
@@ -172,7 +183,10 @@
       title.textContent = "Заявка";
       validateForm();
     }
+    updateBackButton()
   }
+
+
 
   // ===== Screens =====
   function renderCategories() {
@@ -292,19 +306,6 @@
             Посмотреть фото автомобиля
           </button>
         </div>
-
-        ${IS_ADMIN ? `
-        <div class="mt-2 grid grid-cols-2 gap-2">
-          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="addPhoto" data-id="${srv.id}">
-            Добавить фото
-          </button>
-          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="editService" data-id="${srv.id}">
-            Редактировать
-          </button>
-          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="deleteService" data-id="${srv.id}">
-            Удалить
-          </button>
-        </div>` : ``}
       `;
       serviceCards.appendChild(el);
     });
@@ -326,20 +327,51 @@
     });
     serviceCards.appendChild(general);
 
-    // Админ-панель на экране услуг — Добавить карточку товара
+    // Админу показываем кнопку добавления товара ТОЛЬКО если карточек услуг нет
+    // Админ-панель снизу: выбор услуги + действия + добавление товара
     if (IS_ADMIN) {
+      const hasServices = list.length > 0;
       const adminBar = document.createElement("div");
       adminBar.className = "card mt-2";
       adminBar.innerHTML = `
-        <div class="font-semibold">Управление товарами</div>
+        <div class="font-semibold">Управление</div>
+        ${hasServices ? `
+          <div class="mt-2 grid gap-2">
+            <select id="admSrvSelect" class="inp">
+              ${list.map(s => `<option value="${s.id}">${s.title}</option>`).join("")}
+            </select>
+            <div class="grid grid-cols-3 gap-2">
+              <button class="btn btn--pill btn-sm" data-act="admAddPhoto">Добавить фото</button>
+              <button class="btn btn--pill btn-sm" data-act="admEdit">Редактировать услугу</button>
+              <button class="btn btn--pill btn-sm" data-act="admDelete">Удалить карточку</button>
+            </div>
+          </div>
+        ` : `<div class="text-sm opacity-75 mt-2">Для этой модели пока нет карточек услуг</div>`}
         <div class="mt-2">
           <button class="btn btn--pill btn-sm btn-block" data-act="addProductForm">
-            Добавить карточку товара
+            Добавить карточку услуги
           </button>
-        </div>`;
+        </div>
+      `;
       serviceCards.appendChild(adminBar);
+
+      // локальные события админ-панели
+      adminBar.addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-act]");
+        if (!b) return;
+        const act = b.dataset.act;
+        if (act === "addProductForm") return openAddProductForm();
+
+        const select = adminBar.querySelector("#admSrvSelect");
+        const id = select?.value;
+        if (!id) return tg?.showAlert?.("Нет выбранной услуги");
+
+        if (act === "admAddPhoto")  return addPhoto(id);
+        if (act === "admEdit")      return openEditServiceForm(id);
+        if (act === "admDelete")    return deleteService(id);
+      });
     }
-  } // << закрываем renderServices
+  } 
 
   // ===== Галерея фото =====
   async function viewPhotos(serviceId) {
