@@ -66,6 +66,16 @@
   }
   if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
+    const detailsEl = document.getElementById("errorText");
+    if (detailsEl) {
+      const clamp = () => {
+        detailsEl.style.height = "auto";
+        detailsEl.style.height = Math.min(detailsEl.scrollHeight, 120) + "px"; // в пределах max-height
+      };
+      clamp();                            // выставить стартовую высоту
+      detailsEl.addEventListener("input", clamp);
+    }
+
     closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
     errorBtn?.addEventListener("click", onReportClick);
 

@@ -41,3 +41,9 @@ body{background:var(--bg);color:var(--fg)}
   opacity: .5;
   cursor: not-allowed;
 }
+
+#errorText{
+  min-height: 44px;     /* стартовая высота ~2 строки */
+  max-height: 120px;    /* не распухает слишком сильно */
+  resize: vertical;     /* можно вручную тянуть, если нужно */
+}
