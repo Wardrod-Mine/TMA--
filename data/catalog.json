@@ -1,12 +1,12 @@
 {
   "categories": [
     { "code": "localization", "title": "Русификация авто", "from": 15000, "desc": "Перевод меню и приложений мультимедиа", "restricted": false },
-    { "code": "odo_stop", "title": "Стоп-пробег", "from": 35000, "desc": "Остановка записи пробега (может иметь юр. ограничения)", "restricted": true },
-    { "code": "odo_fix", "title": "Корректировка пробега", "from": 2000, "desc": "Корректировка одометра (может иметь юр. ограничения)", "restricted": true },
+    { "code": "odo_stop", "title": "Стоп-пробег", "from": 35000, "desc": "Остановка записи пробега", "restricted": true },
+    { "code": "odo_fix", "title": "Корректировка пробега", "from": 2000, "desc": "Корректировка одометра", "restricted": true },
     { "code": "airbag", "title": "SRS / Crash Data", "from": 3000, "desc": "Прошивка блоков, удаление crash-data", "restricted": true },
     { "code": "electrics", "title": "Ремонт электрооборудования", "from": 1000, "desc": "Компьютерная диагностика и ремонт кос/блоков", "restricted": false },
     { "code": "bluetooth", "title": "Bluetooth в штатную магнитолу", "from": 3000, "desc": "Интеграция BT 5.0, активация AUX", "restricted": false },
-    { "code": "tuning", "title": "Чип-тюнинг / DPF / EGR / AdBlue", "from": 9000, "desc": "Stage, отключение DPF/EGR/AdBlue, катализаторы (юр. ограничения)", "restricted": true },
+    { "code": "tuning", "title": "Чип-тюнинг / DPF / EGR / AdBlue", "from": 9000, "desc": "Stage, отключение DPF/EGR/AdBlue, катализаторы", "restricted": true },
     { "code": "retrofit", "title": "Дооснащение", "from": 5000, "desc": "Камеры, CarPlay/Android Auto, ШГУ и пр.", "restricted": false }
   ],
   "products": [

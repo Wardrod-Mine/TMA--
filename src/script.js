@@ -1,44 +1,33 @@
 (() => {
+  // ===== Telegram & backend =====
   const isTg = typeof window.Telegram !== "undefined" && window.Telegram.WebApp;
   const tg = isTg ? window.Telegram.WebApp : null;
-  const BACKEND_URL = "https://tma-den-serv.onrender.com"
+  const BACKEND_URL = window.BACKEND_URL || window.SERVER_URL || "https://tma-den-serv.onrender.com";
 
-  const askText = document.getElementById("askText");
-  const askBtn  = document.getElementById("askBtn");
-
-
+  // ===== DOM =====
   const title = document.getElementById("title");
   const userInfo = document.getElementById("userInfo");
   const backBtn = document.getElementById("backBtn");
   const closeBtn = document.getElementById("closeApp");
-  const errorBtn = document.getElementById("errorBtn");
-
   const sCategories = document.getElementById("screen-categories");
-  const sBrands = document.getElementById("screen-brands");
-  const sModels = document.getElementById("screen-models");
-  const sServices = document.getElementById("screen-services");
-  const sForm = document.getElementById("screen-form");
-
+  const sBrands     = document.getElementById("screen-brands");
+  const sModels     = document.getElementById("screen-models");
+  const sServices   = document.getElementById("screen-services");
+  const sForm       = document.getElementById("screen-form");
   const brandSearch = document.getElementById("brandSearch");
-  const brandList = document.getElementById("brandList");
+  const brandList   = document.getElementById("brandList");
   const modelSearch = document.getElementById("modelSearch");
-  const modelList = document.getElementById("modelList");
-  const serviceCards = document.getElementById("serviceCards");
-  const legalNotice = document.getElementById("legalNotice");
-  const legalCheckbox = document.getElementById("legalCheckbox");
-
-  const fName = document.getElementById("fName");
-  const fPhone = document.getElementById("fPhone");
-  const fCity = document.getElementById("fCity");
+  const modelList   = document.getElementById("modelList");
+  const serviceCards= document.getElementById("serviceCards");
+  const fName    = document.getElementById("fName");
+  const fPhone   = document.getElementById("fPhone");
+  const fCity    = document.getElementById("fCity");
   const fComment = document.getElementById("fComment");
-  const formSummary = document.getElementById("formSummary");
-  const sendBtn = document.getElementById("sendBtn");
+  const sendBtn  = document.getElementById("sendBtn");
+  const askText  = document.getElementById("askText");
+  const askBtn   = document.getElementById("askBtn");
 
-  // какие категории скрываем из каталога
-  const HIDDEN_CATEGORIES = new Set(["electrics", "bluetooth", "products"]);
-
-
-  // State
+  // ===== State =====
   const state = {
     step: "categories",
     catalog: null,
@@ -46,7 +35,10 @@
     history: []
   };
 
-  // === admin flag ===
+  // какие категории скрываем
+  const HIDDEN_CATEGORIES = new Set(["electrics", "bluetooth", "products"]);
+
+  // ===== Admin flag =====
   let IS_ADMIN = false;
   (async function detectAdmin() {
     try {
@@ -55,14 +47,16 @@
       });
       const j = await res.json();
       IS_ADMIN = !!j.admin;
-      if (IS_ADMIN && userInfo) userInfo.textContent = (userInfo.textContent || "") + " • admin";
-      if (IS_ADMIN && state.step === "categories") renderCategories();
-      if (IS_ADMIN && state.step === "services") renderServices();
+      if (IS_ADMIN && userInfo) {
+        userInfo.textContent = (userInfo.textContent || "") + " • admin";
+      }
+      // дорисуем то, где уже находимся
+      if (state.step === "categories") renderCategories();
+      if (state.step === "services")   renderServices();
     } catch {}
   })();
 
-  
-  // Init
+  // ===== Init =====
   init();
   async function init() {
     if (tg) {
@@ -72,22 +66,22 @@
       const u = tg?.initDataUnsafe?.user;
       if (u) userInfo.textContent = u.username ? `@${u.username}` : (u.first_name || "");
       tg.MainButton.setParams({ text: "Отправить заявку", is_visible: false, is_active: true });
-      tg.onEvent("mainButtonClicked", onSubmit);
     } else {
+      // dev режим
       console.warn("Dev mode: Telegram.WebApp не найден");
       userInfo.textContent = "Dev mode";
-      IS_ADMIN = true;
+      IS_ADMIN = true; // в браузере покажем админ-функции для проверки
     }
 
-    // Load data
+    // Загрузка каталога
     const res = await fetch("./data/catalog.json");
-    state.catalog = await res.json();// полностью убираем скрытые категории и все их услуги
-    state.catalog.categories = state.catalog.categories
-      .filter(c => !HIDDEN_CATEGORIES.has(c.code));
-    state.catalog.services = state.catalog.services
-      .filter(s => !HIDDEN_CATEGORIES.has(s.category))
+    state.catalog = await res.json();
 
-    // подмешиваем правки/удаления из бэка
+    // Спрятать скрытые категории/услуги (перестраховка)
+    state.catalog.categories = (state.catalog.categories || []).filter(c => !HIDDEN_CATEGORIES.has(c.code));
+    state.catalog.services   = (state.catalog.services   || []).filter(s => !HIDDEN_CATEGORIES.has(s.category));
+
+    // Подмешиваем правки/удаления услуг с бэка
     try {
       const r = await fetch(`${BACKEND_URL}/services`);
       const j = await r.json();
@@ -101,285 +95,125 @@
       }
     } catch (e) { console.warn("services overrides fetch failed", e); }
 
-    renderCategories();
     wireCommon();
+    renderCategories();
+    showScreen("categories");
   }
 
-  //if (sendBtn) sendBtn.disabled = false;
+  // ===== Wiring =====
   function wireCommon() {
-    askBtn?.addEventListener("click", onAskSend);
-    const detailsEl = document.getElementById("errorText");
-    if (detailsEl) {
-      const clamp = () => {
-        detailsEl.style.height = "auto";
-        detailsEl.style.height = Math.min(detailsEl.scrollHeight, 120) + "px"; // в пределах max-height
-      };
-      clamp();                            // выставить стартовую высоту
-      detailsEl.addEventListener("input", clamp);
-    }
-    sCategories.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act='addProductForm']");
-      if (!btn) return;
-      if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору");
-      openAddProductForm();
+    closeBtn?.addEventListener("click", () => tg ? tg.close() : window.close());
+
+    backBtn?.addEventListener("click", () => {
+      if (!state.history.length) return;
+      const prev = state.history.pop();
+      showScreen(prev, /*fromBack*/ true);
     });
 
+    brandSearch?.addEventListener("input", () => renderBrands(brandSearch.value));
+    modelSearch?.addEventListener("input", () => renderModels(modelSearch.value));
 
-    closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
-    errorBtn?.addEventListener("click", onReportClick);
+    // «вопрос админу»
+    askBtn?.addEventListener("click", onAskSend);
+
+    // клики по карточкам услуг (делегирование)
     serviceCards.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-act]");
       if (!btn) return;
-      const id = btn.dataset.id;
+      const id  = btn.dataset.id;
       const act = btn.dataset.act;
+
       if (act === "lead") {
+        // найти услугу и открыть форму
         const srv = (state.catalog?.services || []).find(s => s.id === id);
         if (!srv) return;
         state.selection.service = srv;
         showScreen("form");
       }
       if (act === "viewPhotos") return viewPhotos(id);
-      if (act === "addPhoto") return addPhoto(id);
-      if (act === "editService") return openEditServiceForm(id);
+      if (act === "addPhoto")  return addPhoto(id);
+      if (act === "editService")   return openEditServiceForm(id);
       if (act === "deleteService") return deleteService(id);
-    });
-    backBtn.addEventListener("click", () => {
-      if (!state.history.length) return;
-      const prev = state.history.pop();
-      showScreen(prev, /*fromBack*/ true);
+      if (act === "addProductForm") return openAddProductForm(); // админ
     });
 
-    brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
-    modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
-    // клики по кнопкам внутри карточек услуг
-
-
-    [fName, fPhone, fCity, fComment].forEach(el => {
-      el.addEventListener("input", validateForm);
-    });
-    legalCheckbox?.addEventListener("change", validateForm);
-
-    sendBtn.addEventListener("click", onSubmit);
+    // лайв-валидация формы
+    [fName, fPhone, fCity, fComment].forEach(el => el?.addEventListener("input", validateForm));
+    sendBtn?.addEventListener("click", onSubmit);
   }
 
-  // === ERROR REPORTING ===
-  let lastError = null;
-
-  // Автосбор последних ошибок
-  window.addEventListener("error", (e) => {
-    lastError = {
-      type: "error",
-      message: e.message,
-      source: e.filename,
-      line: e.lineno,
-      column: e.colno,
-      stack: e.error?.stack ? String(e.error.stack).slice(0, 4000) : null
-    };
-  });
-  window.addEventListener("unhandledrejection", (e) => {
-    lastError = {
-      type: "unhandledrejection",
-      message: e.reason?.message || String(e.reason),
-      stack: e.reason?.stack ? String(e.reason.stack).slice(0, 4000) : null
-    };
-  });
-
-  function collectDebug(extra = {}) {
-    const u = tg?.initDataUnsafe?.user;
-    return {
-      ts: new Date().toISOString(),
-      // url: location.href,            // ← УДАЛЕНО, ссылку не шлём
-      appStep: state.step,
-      selection: state.selection,
-      platform: tg?.platform || "web",
-      colorScheme: tg?.colorScheme || null,
-      viewport: { w: innerWidth, h: innerHeight },
-      user: u ? { id: u.id, username: u.username || null, first_name: u.first_name || null } : null,
-      lastError,
-      ...extra
-    };
-  }
-
-
-
-
-  function onReportClick() {
-    const detailsEl = document.getElementById("errorText");
-    const summary = "Отправим: платформу, шаг/выбор, user_id и последнюю ошибку (если поймана). Без ссылки на страницу.";
-    if (tg?.showPopup) {
-      tg.showPopup({
-        title: "Сообщить об ошибке?",
-        message: summary,
-        buttons: [{id:"cancel", type:"close", text:"Отмена"}, {id:"ok", type:"default", text:"Отправить"}]
-      }, async (btnId) => {
-        if (btnId !== "ok") return;
-        await doSend();
-      });
-    } else {
-      if (confirm(summary + "\n\nОтправить отчёт?")) doSend();
-    }
-
-    async function doSend() {
-      try {
-        const details = detailsEl ? detailsEl.value.trim() : "";
-        tg?.HapticFeedback.impactOccurred("light");
-
-        await postErrorReport({
-          kind: "error_report",
-          details,                      // <-- ТВОЙ ТЕКСТ
-          debug: collectDebug({ note: details || undefined })
-        });
-
-        tg?.HapticFeedback.notificationOccurred("success");
-        tg?.showAlert?.("Спасибо! Отчёт отправлен.");
-        if (detailsEl) detailsEl.value = ""; // очистим поле
-        lastError = null;
-      } catch (e) {
-        console.warn(e);
-        tg?.HapticFeedback.notificationOccurred("error");
-        tg?.showAlert?.("Не удалось отправить отчёт. Попробуйте позже.");
-      }
-    }
-  }
-
-  async function postErrorReport(payload) {
-    const initData = tg?.initData || "";
-    const res = await fetch(`${BACKEND_URL}/report-error`, {  // BACKEND_URL уже есть в файле
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Telegram-Init-Data": initData
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text().catch(()=>"send failed"));
-  }
-
+  // ===== Screens common =====
   function showScreen(name, fromBack = false) {
-    // remember current step for back
     if (state.step && state.step !== name && !fromBack) state.history.push(state.step);
     state.step = name;
 
-    // toggle
-    [sCategories, sBrands, sModels, sServices, sForm].forEach(el => el.classList.add("hidden"));
-    backBtn.classList.remove("hidden");
-    tg?.MainButton.hide();
+    [sCategories, sBrands, sModels, sServices, sForm].forEach(el => el?.classList?.add("hidden"));
 
-    switch (name) {
-      case "categories": backBtn.classList.add("hidden"); sCategories.classList.remove("hidden"); title.textContent = "Услуги"; break;
-      case "brands": sBrands.classList.remove("hidden"); title.textContent = state.selection.category.title; break;
-      case "models": sModels.classList.remove("hidden"); title.textContent = `${state.selection.brand}`; break;
-      case "services": sServices.classList.remove("hidden"); title.textContent = `${state.selection.brand} • ${state.selection.model}`; break;
-      case "form":
-        sForm.classList.remove("hidden");
-        title.textContent = "Заявка";
-        updateFormSummary();
-        // В Telegram показываем только системный MainButton, внутреннюю кнопку скрываем
-        if (tg) {
-          sendBtn.classList.add("hidden");
-        } else {
-          sendBtn.classList.remove("hidden");
-        }
-        validateForm(); // актуализируем видимость MainButton и состояния
-        break;
+    if (name === "categories") {
+      sCategories.classList.remove("hidden");
+      title.textContent = "Каталог";
+    }
+    if (name === "brands") {
+      sBrands.classList.remove("hidden");
+      title.textContent = state.selection.category?.title || "Выбор марки";
+    }
+    if (name === "models") {
+      sModels.classList.remove("hidden");
+      title.textContent = state.selection.brand || "Выбор модели";
+    }
+    if (name === "services") {
+      sServices.classList.remove("hidden");
+      const cat = state.selection.category?.title || "";
+      const bm  = `${state.selection.brand || ""} • ${state.selection.model || ""}`.trim();
+      title.textContent = bm ? `${bm}` : cat || "Услуги";
+    }
+    if (name === "form") {
+      sForm.classList.remove("hidden");
+      title.textContent = "Заявка";
+      validateForm();
     }
   }
 
+  // ===== Screens =====
   function renderCategories() {
     sCategories.innerHTML = "";
-    state.catalog.categories
-      .filter(cat => !HIDDEN_CATEGORIES.has(cat.code)) // фильтруем лишние
-      .forEach(cat => {
-        const el = document.createElement("button");
-        el.className = "card w-full text-left";
-        el.innerHTML = `
-          <div class="flex items-center justify-between">
-            <div>
-              <div class="font-semibold">${cat.title}</div>
-              <div class="text-sm opacity-75">${cat.desc || ""}</div>
-            </div>
-            <div class="text-right text-sm opacity-80">от ${formatPrice(cat.from)}</div>
-          </div>`;
-        el.addEventListener("click", () => {
-          state.selection.category = cat;
-          renderBrands();
-          showScreen("brands");
-        });
-        sCategories.appendChild(el);
+
+    (state.catalog.categories || []).forEach(cat => {
+      const el = document.createElement("button");
+      el.className = "card w-full text-left";
+      el.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-semibold">${cat.title}</div>
+            <div class="text-sm opacity-75">${cat.desc || ""}</div>
+          </div>
+          <div class="text-right text-sm opacity-80">от ${formatPrice(cat.from)}</div>
+        </div>
+      `;
+      el.addEventListener("click", () => {
+        state.selection.category = cat;
+        renderBrands();
+        showScreen("brands");
       });
-      // Админ-панель: Добавить товар
-      if (IS_ADMIN) {
-        const adminBar = document.createElement("div");
-        adminBar.className = "card mt-2";
-        adminBar.innerHTML = `
-          <div class="font-semibold">Управление товарами</div>
-          <div class="mt-2">
-            <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить товар</button>
-          </div>`;
-        sCategories.appendChild(adminBar);
-      }
-    showScreen("categories");
-  }
-  function openAddProductForm() {
-    const overlay = document.createElement("div");
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="overlay__inner">
-        <div class="font-semibold mb-2">Новый товар</div>
-        <div class="grid gap-2">
-          <input id="ap_title" class="inp" placeholder="Название товара"/>
-          <input id="ap_price" class="inp" placeholder="Цена от, ₽" type="number" min="0" step="1"/>
-          <textarea id="ap_desc" class="inp" rows="3" placeholder="Краткое описание"></textarea>
-        </div>
-        <div class="mt-3 grid grid-cols-2 gap-2">
-          <button class="btn btn--pill btn-lg" id="ap_save">Сохранить</button>
-          <button class="btn btn--secondary btn--pill btn-lg overlay__close">Отмена</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
-    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+      sCategories.appendChild(el);
+    });
 
-    overlay.querySelector("#ap_save").onclick = async () => {
-      const title = overlay.querySelector("#ap_title").value.trim();
-      const price_from = Number(overlay.querySelector("#ap_price").value);
-      const desc = overlay.querySelector("#ap_desc").value.trim();
-      if (!title || !Number.isFinite(price_from) || price_from < 0) {
-        return tg?.showAlert?.("Заполните название и корректную цену");
-      }
-      try {
-        tg?.MainButton.setParams({ text: "Сохраняем…" });
-        tg?.MainButton.show(); tg?.MainButton.disable();
-
-        const res = await fetch(`${BACKEND_URL}/products`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Telegram-Init-Data": tg?.initData || ""
-          },
-          body: JSON.stringify({ title, price_from, desc })
-        });
-        const j = await res.json().catch(()=>null);
-        if (!res.ok || !j?.ok) throw new Error(j?.error || "save failed");
-
-        overlay.remove();
-        tg?.HapticFeedback.notificationOccurred("success");
-        tg?.showAlert?.("Товар сохранён ✅");
-        // при желании: сразу предложить добавить фото по id товара:
-        // addPhoto(j.item.id);
-      } catch (e) {
-        console.warn(e);
-        tg?.HapticFeedback.notificationOccurred("error");
-        tg?.showAlert?.("Не удалось сохранить товар");
-      } finally {
-        tg?.MainButton.hide();
-      }
-    };
+    // Админ-панель на главном — Добавить товар
+    if (IS_ADMIN) {
+      const adminBar = document.createElement("div");
+      adminBar.className = "card mt-2";
+      adminBar.innerHTML = `
+        <div class="font-semibold">Управление товарами</div>
+        <div class="mt-2">
+          <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить товар</button>
+        </div>`;
+      sCategories.appendChild(adminBar);
+    }
   }
 
   function renderBrands(filter = "") {
     brandList.innerHTML = "";
-    const brands = state.catalog.brands
+    const brands = (state.catalog.brands || [])
       .filter(b => b.toLowerCase().includes(filter.trim().toLowerCase()));
 
     brands.forEach(b => {
@@ -398,24 +232,25 @@
 
   function renderModels(filter = "") {
     modelList.innerHTML = "";
-    const models = state.catalog.models[state.selection.brand] || [];
-    models
-      .filter(m => m.toLowerCase().includes(filter.trim().toLowerCase()))
-      .forEach(m => {
-        const el = document.createElement("button");
-        el.type = "button";
-        el.className = "item text-center";
-        el.textContent = m;
-        el.addEventListener("click", () => {
-          state.selection.model = m;
-          renderServices();
-          showScreen("services");
-        });
-        modelList.appendChild(el);
+    const models = (state.catalog.models[state.selection.brand] || [])
+      .filter(m => m.toLowerCase().includes(filter.trim().toLowerCase()));
+
+    models.forEach(m => {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "item text-center";
+      el.textContent = m;
+      el.addEventListener("click", () => {
+        state.selection.model = m;
+        renderServices();
+        showScreen("services");
       });
+      modelList.appendChild(el);
+    });
   }
 
   function renderServices() {
+    // защита
     if (HIDDEN_CATEGORIES.has(state.selection.category?.code)) {
       tg?.showAlert?.("Этот раздел временно недоступен");
       return showScreen("categories");
@@ -423,16 +258,21 @@
 
     serviceCards.innerHTML = "";
 
-    const list = state.catalog.services.filter(s =>
+    const list = (state.catalog.services || []).filter(s =>
       s.category === state.selection.category.code &&
-      s.brand === state.selection.brand &&
-      s.model === state.selection.model
+      s.brand    === state.selection.brand &&
+      s.model    === state.selection.model
     );
 
     if (!list.length) {
-      serviceCards.innerHTML = `<div class="text-sm opacity-70">
-        Пока нет преднастроенных карточек для этой модели. Вы можете всё равно оставить заявку на общую услугу.
-      </div>`;
+      const empty = document.createElement("div");
+      empty.className = "card";
+      empty.innerHTML = `
+        <div class="text-sm opacity-80">
+          Пока нет преднастроенных карточек для этой модели. 
+          Вы можете всё равно оставить заявку на общую услугу.
+        </div>`;
+      serviceCards.appendChild(empty);
     }
 
     list.forEach(srv => {
@@ -454,7 +294,7 @@
         </div>
 
         ${IS_ADMIN ? `
-        <div class="mt-2">
+        <div class="mt-2 grid grid-cols-2 gap-2">
           <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="addPhoto" data-id="${srv.id}">
             Добавить фото
           </button>
@@ -464,228 +304,85 @@
           <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="deleteService" data-id="${srv.id}">
             Удалить
           </button>
-        </div>` : ``}`;
+        </div>` : ``}
+      `;
       serviceCards.appendChild(el);
     });
 
-
-    // Общая заявка по категории/модели
+    // Общая заявка
     const general = document.createElement("button");
     general.className = "btn btn-block btn--pill btn-lg mt-2";
     general.textContent = "Оставить общую заявку по этой услуге";
-    general.dataset.act = "lead";
-    general.dataset.id = "general";
     general.addEventListener("click", () => {
       state.selection.service = {
         id: "general",
         category: state.selection.category.code,
         brand: state.selection.brand,
         model: state.selection.model,
-        title: `Заявка: ${state.selection.category.title}`
+        title: `Заявка: ${state.selection.category.title}`,
+        price_from: state.selection.category.from
       };
       showScreen("form");
     });
     serviceCards.appendChild(general);
-  }
 
+    // Админ-панель на экране услуг — Добавить карточку товара
+    if (IS_ADMIN) {
+      const adminBar = document.createElement("div");
+      adminBar.className = "card mt-2";
+      adminBar.innerHTML = `
+        <div class="font-semibold">Управление товарами</div>
+        <div class="mt-2">
+          <button class="btn btn--pill btn-sm btn-block" data-act="addProductForm">
+            Добавить карточку товара
+          </button>
+        </div>`;
+      serviceCards.appendChild(adminBar);
+    }
+  } // << закрываем renderServices
+
+  // ===== Галерея фото =====
   async function viewPhotos(serviceId) {
-  try {
-    const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`);
-    const j = await res.json();
-    const items = (j.items || []).slice(0, 20);
-    if (!items.length) {
-      return tg?.showAlert?.("Фото пока нет.") || alert("Фото пока нет.");
-    }
-
-    const overlay = document.createElement("div");
-    overlay.className = "overlay";
-    overlay.innerHTML = `
-      <div class="overlay__inner">
-        <div class="overlay__grid">
-          ${items.map(x => `<img src="${BACKEND_URL}${x.url}" alt="" loading="lazy">`).join("")}
-        </div>
-        <button class="btn overlay__close">Закрыть</button>
-      </div>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
-    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
-  } catch (e) {
-    console.warn(e);
-    tg?.showAlert?.("Не удалось загрузить фото") || alert("Не удалось загрузить фото");
-  }
-}
-
-  async function addPhoto(serviceId) {
-    if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору") || alert("Доступно только администратору");
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      try {
-        tg?.MainButton.setParams({ text: "Загрузка фото…" });
-        tg?.MainButton.show(); tg?.MainButton.disable();
-
-        const fd = new FormData();
-        fd.append("photo", file, file.name || "photo.jpg");
-        const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`, {
-          method: "POST",
-          headers: { "X-Telegram-Init-Data": tg?.initData || "" },
-          body: fd
-        });
-        if (!res.ok) throw new Error(await res.text().catch(()=>"upload failed"));
-
-        tg?.HapticFeedback.notificationOccurred("success");
-        tg?.showAlert?.("Фото добавлено ✅") || alert("Фото добавлено ✅");
-      } catch (e) {
-        console.warn(e);
-        tg?.HapticFeedback.notificationOccurred("error");
-        tg?.showAlert?.("Не удалось загрузить фото") || alert("Не удалось загрузить фото");
-      } finally {
-        tg?.MainButton.hide();
-      }
-    };
-    input.click();
-  }
-
-  function updateFormSummary() {
-    const { category, brand, model, service } = state.selection;
-    formSummary.textContent =
-      `${category.title} → ${brand} → ${model} → ${service?.title || "Без названия"}`;
-  }
-
-  // Submit
-  async function onSubmit() {
-    if (!validateForm()) {
-      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
-      else alert("Заполните имя и телефон.");
-      return;
-    }
-
-    const payload = {
-      type: "lead",
-      ts: Date.now(),
-      category: state.selection.category.title,
-      brand: state.selection.brand,
-      model: state.selection.model,
-      service: state.selection.service?.title || null,
-      price_from: state.selection.service?.price_from || state.selection.category.from || null,
-      name: fName.value.trim(),
-      phone: fPhone.value.trim(),
-      city: fCity.value.trim(),
-      comment: fComment.value.trim()
-    };
-
     try {
-      // 1) Отправка в бота
-      tg?.sendData(JSON.stringify(payload));
+      const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`);
+      const j = await res.json();
+      const items = (j.items || []);
+      if (!items.length) return tg?.showAlert?.("Фото пока нет.") || alert("Фото пока нет.");
 
-      // 2) (опционально) параллельно — на ваш бекенд
-      if (BACKEND_URL && BACKEND_URL.startsWith("http")) {
-        await fetch(`${BACKEND_URL}/web-data`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }
-      tg?.HapticFeedback.impactOccurred("light");
-      tg?.showAlert?.("Заявка отправлена. Мы свяжемся с вами.");
+      const overlay = document.createElement("div");
+      overlay.className = "overlay";
+      overlay.innerHTML = `
+        <div class="overlay__inner">
+          <div class="overlay__grid">
+            ${items.map(x => `<img src="${BACKEND_URL}${x.url}" alt="" loading="lazy">`).join("")}
+          </div>
+          <button class="btn overlay__close">Закрыть</button>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
+      overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
     } catch (e) {
-      console.warn("submit error", e);
-      alert("Не удалось отправить заявку. Попробуйте позже.");
-    }
-  }
-  // === phone validation ===
-  // Регион берём из языка Telegram (ru/uk/kk/be) → RU/UA/KZ/BY, иначе GLOBAL.
-  function detectRegion() {
-    const lang = (tg?.initDataUnsafe?.user?.language_code || "").toLowerCase();
-    if (lang.startsWith("ru")) return "RU";
-    if (lang.startsWith("kk")) return "KZ";
-    if (lang.startsWith("uk")) return "UA";
-    if (lang.startsWith("be")) return "BY";
-    return "RU"; // по умолчанию
-  }
-  function validatePhoneByRegion(value, region = "RU") {
-    const digits = value.replace(/\D/g, "");
-    switch (region) {
-      case "RU": // мобильные: +7 9xx xxx-xx-xx, допускаем ведущие 8/7/+7
-        return /^9\d{9}$/.test(digits) || /^79\d{9}$/.test(digits) || /^89\d{9}$/.test(digits);
-      case "KZ": // Казахстан: +7 7xx xxx-xx-xx
-        return /^77\d{8}$/.test(digits) || /^7?7\d{9}$/.test(digits);
-      case "UA": // Украина: +380 xx xxx-xx-xx (мобилки 39/50/63/66/67/68/73/89/91/92/93/94/95/96/97/98/99)
-        return /^(380(39|50|63|66|67|68|73|89|91|92|93|94|95|96|97|98|99)\d{7})$/.test(digits);
-      case "BY": // Беларусь: +375 xx xxx-xx-xx (25/29/33/44)
-        return /^(375(25|29|33|44)\d{7})$/.test(digits);
-      default:  // E.164 упрощённо
-        return /^\+?[1-9]\d{9,14}$/.test(value.replace(/\s/g, ""));
+      console.warn(e);
+      tg?.showAlert?.("Не удалось загрузить фото");
     }
   }
 
-  // Helpers
-  function validateForm() {
-    const okName = fName.value.trim().length >= 2;
-    const region = detectRegion();
-    const okPhone = validatePhoneByRegion(fPhone.value.trim(), region);
-    const valid = okName && okPhone;
-
-    if (!tg) sendBtn.disabled = !valid;
-
-    if (tg) {
-      tg.MainButton.setParams({ text: "Отправить заявку" });
-      tg.MainButton[valid ? "show" : "hide"]();
+  async function addPhoto(serviceIdOrProductId) {
+    if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору");
+    // запрос на отправку фото через бота
+    try {
+      const res = await fetch(`${BACKEND_URL}/file?for=${encodeURIComponent(serviceIdOrProductId)}`);
+      const j = await res.json();
+      if (!j?.ok) throw new Error("file link failed");
+      tg?.showAlert?.("Отправьте фото боту в ЛС. Ссылка скопирована.");
+      await navigator.clipboard?.writeText(j.dm || "");
+    } catch (e) {
+      console.warn(e);
+      tg?.showAlert?.("Не удалось подготовить загрузку");
     }
-    return valid;
   }
 
-async function onAskSend() {
-  const text = askText?.value.trim();
-  if (!text) return tg?.showAlert?.("Введите вопрос") || alert("Введите вопрос");
-  try {
-    tg?.MainButton.setParams({ text: "Отправка вопроса…" });
-    tg?.MainButton.show(); tg?.MainButton.disable();
-
-    await postAsk({ text });
-    tg?.HapticFeedback.notificationOccurred("success");
-    tg?.showAlert?.("Отправили! Мы свяжемся с вами.") || alert("Отправили!");
-    askText.value = "";
-  } catch (e) {
-    console.warn(e);
-    tg?.HapticFeedback.notificationOccurred("error");
-    tg?.showAlert?.("Не удалось отправить вопрос") || alert("Не удалось отправить вопрос");
-  } finally {
-    tg?.MainButton.hide();
-  }
-  }
-
-  async function postAsk(payload) {
-    const initData = tg?.initData || "";
-    const res = await fetch(`${BACKEND_URL}/ask`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Telegram-Init-Data": initData
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text().catch(()=>"ask failed"));
-    return res.json();
-  }
-
-
-
-
-  function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
-
-  function applyTheme(tp){
-    const root = document.documentElement;
-    if (tp?.bg_color) root.style.setProperty("--bg", tp.bg_color);
-    if (tp?.text_color) root.style.setProperty("--fg", tp.text_color);
-    if (tp?.hint_color) root.style.setProperty("--muted", tp.hint_color);
-    if (tp?.link_color) root.style.setProperty("--accent", tp.link_color);
-    if (tp?.section_separator_color) root.style.setProperty("--border", tp.section_separator_color);
-  }
-
+  // ===== Админ: правка/удаление услуги =====
   function openEditServiceForm(id) {
     const srv = (state.catalog.services || []).find(s => s.id === id);
     if (!srv) return;
@@ -759,7 +456,7 @@ async function onAskSend() {
       });
       const j = await res.json().catch(()=>null);
       if (!res.ok || !j?.ok) throw new Error(j?.error || "delete failed");
-      // убираем из локального списка
+      // убрать локально
       state.catalog.services = (state.catalog.services || []).filter(s => s.id !== id);
       renderServices();
       tg?.HapticFeedback.notificationOccurred("success");
@@ -771,6 +468,8 @@ async function onAskSend() {
       tg?.MainButton.hide();
     }
   }
+
+  // ===== Админ: добавить товар =====
   function openAddProductForm() {
     const overlay = document.createElement("div");
     overlay.className = "overlay";
@@ -816,7 +515,7 @@ async function onAskSend() {
         overlay.remove();
         tg?.HapticFeedback.notificationOccurred("success");
         tg?.showAlert?.("Товар сохранён ✅");
-        // Можно сразу предложить добавить фото к товару:
+        // можно сразу предложить добавить фото:
         // addPhoto(j.item.id);
       } catch (e) {
         console.warn(e);
@@ -828,5 +527,104 @@ async function onAskSend() {
     };
   }
 
+  // ===== Вопрос админу =====
+  async function onAskSend() {
+    const text = askText?.value.trim();
+    if (!text) return tg?.showAlert?.("Введите вопрос") || alert("Введите вопрос");
+    try {
+      tg?.MainButton.setParams({ text: "Отправка вопроса…" });
+      tg?.MainButton.show(); tg?.MainButton.disable();
 
+      const res = await fetch(`${BACKEND_URL}/ask`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Telegram-Init-Data": tg?.initData || ""
+        },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error("ask failed");
+      tg?.HapticFeedback.notificationOccurred("success");
+      tg?.showAlert?.("Отправили! Мы свяжемся с вами.") || alert("Отправили!");
+      askText.value = "";
+    } catch (e) {
+      console.warn(e);
+      tg?.HapticFeedback.notificationOccurred("error");
+      tg?.showAlert?.("Не удалось отправить вопрос") || alert("Не удалось отправить вопрос");
+    } finally {
+      tg?.MainButton.hide();
+    }
+  }
+
+  // ===== Отправка заявки =====
+  function validateForm() {
+    const okName  = fName?.value.trim().length >= 2;
+    const okPhone = /^[+0-9()\-\s]{6,}$/.test(fPhone?.value.trim() || "");
+    const valid = okName && okPhone;
+
+    if (!tg) sendBtn.disabled = !valid;
+    if (tg) {
+      tg.MainButton.setParams({ text: "Отправить заявку" });
+      tg.MainButton[valid ? "show" : "hide"]();
+    }
+    return valid;
+  }
+
+  async function onSubmit() {
+    if (!validateForm()) {
+      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
+      else alert("Заполните имя и телефон.");
+      return;
+    }
+
+    const payload = {
+      type: "lead",
+      ts: Date.now(),
+      category: state.selection.category?.title,
+      brand: state.selection.brand,
+      model: state.selection.model,
+      service: state.selection.service?.title || null,
+      price_from: state.selection.service?.price_from || state.selection.category?.from || null,
+      name: fName.value.trim(),
+      phone: fPhone.value.trim(),
+      city: fCity?.value.trim() || "",
+      comment: fComment?.value.trim() || ""
+    };
+
+    try {
+      tg?.MainButton.setParams({ text: "Отправляем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+      const res = await fetch(`${BACKEND_URL}/lead`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Telegram-Init-Data": tg?.initData || ""
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error("lead failed");
+      tg?.HapticFeedback.notificationOccurred("success");
+      tg?.showAlert?.("Заявка отправлена ✅") || alert("Заявка отправлена ✅");
+      // очистить форму
+      [fName, fPhone, fCity, fComment].forEach(el => el && (el.value = ""));
+      showScreen("categories");
+    } catch (e) {
+      console.warn(e);
+      tg?.HapticFeedback.notificationOccurred("error");
+      tg?.showAlert?.("Не удалось отправить") || alert("Не удалось отправить");
+    } finally {
+      tg?.MainButton.hide();
+    }
+  }
+
+  // ===== Utils =====
+  function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
+
+  function applyTheme(tp){
+    const root = document.documentElement;
+    if (tp?.bg_color)   root.style.setProperty("--bg", tp.bg_color);
+    if (tp?.text_color) root.style.setProperty("--fg", tp.text_color);
+    if (tp?.hint_color) root.style.setProperty("--muted", tp.hint_color);
+    if (tp?.link_color) root.style.setProperty("--accent", tp.link_color);
+    if (tp?.section_separator_color) root.style.setProperty("--border", tp.section_separator_color);
+  }
 })();
