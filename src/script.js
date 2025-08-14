@@ -3,6 +3,9 @@
   const tg = isTg ? window.Telegram.WebApp : null;
   const BACKEND_URL = "https://tma-den-serv.onrender.com"
 
+  const askText = document.getElementById("askText");
+  const askBtn  = document.getElementById("askBtn");
+
 
   const title = document.getElementById("title");
   const userInfo = document.getElementById("userInfo");
@@ -87,6 +90,7 @@
   }
   //if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
+    askBtn?.addEventListener("click", onAskSend);
     const detailsEl = document.getElementById("errorText");
     if (detailsEl) {
       const clamp = () => {
@@ -330,10 +334,8 @@
       tg?.showAlert?.("Этот раздел временно недоступен");
       return showScreen("categories");
     }
+
     serviceCards.innerHTML = "";
-    const restrictedCat = !!state.selection.category.restricted;
-    legalNotice.classList.toggle("hidden", !restrictedCat);
-    legalCheckbox.checked = false;
 
     const list = state.catalog.services.filter(s =>
       s.category === state.selection.category.code &&
@@ -530,16 +532,11 @@
 
   // Helpers
   function validateForm() {
-    const restricted = !!state.selection.category?.restricted;
-    const okLegal = !restricted || legalCheckbox.checked;
-
     const okName = fName.value.trim().length >= 2;
     const region = detectRegion();
     const okPhone = validatePhoneByRegion(fPhone.value.trim(), region);
+    const valid = okName && okPhone;
 
-    const valid = okName && okPhone && okLegal;
-
-    // вне Telegram — блокируем кнопку, пока форма невалидна
     if (!tg) sendBtn.disabled = !valid;
 
     if (tg) {
@@ -547,6 +544,40 @@
       tg.MainButton[valid ? "show" : "hide"]();
     }
     return valid;
+  }
+
+async function onAskSend() {
+  const text = askText?.value.trim();
+  if (!text) return tg?.showAlert?.("Введите вопрос") || alert("Введите вопрос");
+  try {
+    tg?.MainButton.setParams({ text: "Отправка вопроса…" });
+    tg?.MainButton.show(); tg?.MainButton.disable();
+
+    await postAsk({ text });
+    tg?.HapticFeedback.notificationOccurred("success");
+    tg?.showAlert?.("Отправили! Мы свяжемся с вами.") || alert("Отправили!");
+    askText.value = "";
+  } catch (e) {
+    console.warn(e);
+    tg?.HapticFeedback.notificationOccurred("error");
+    tg?.showAlert?.("Не удалось отправить вопрос") || alert("Не удалось отправить вопрос");
+  } finally {
+    tg?.MainButton.hide();
+  }
+  }
+
+  async function postAsk(payload) {
+    const initData = tg?.initData || "";
+    const res = await fetch(`${BACKEND_URL}/ask`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": initData
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text().catch(()=>"ask failed"));
+    return res.json();
   }
 
 
