@@ -76,7 +76,7 @@
     renderCategories();
     wireCommon();
   }
-  if (sendBtn) sendBtn.disabled = false;
+  //if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
     const detailsEl = document.getElementById("errorText");
     if (detailsEl) {
@@ -339,7 +339,7 @@
           <button class="btn btn-block" data-act="lead" data-id="${srv.id}">
             Оставить заявку
           </button>
-          <button class="btn btn--secondary" data-act="viewPhotos" data-id="${srv.id}">
+          <button class="btn btn-block" data-act="viewPhotos" data-id="${srv.id}">
             Посмотреть фото автомобиля
           </button>
         </div>
@@ -353,6 +353,7 @@
       `;
       serviceCards.appendChild(el);
     });
+
 
     // Общая заявка по категории/модели
     const general = document.createElement("button");
