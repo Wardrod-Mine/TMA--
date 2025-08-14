@@ -140,7 +140,6 @@
       if (act === "addPhoto")  return addPhoto(id);
       if (act === "editService")   return openEditServiceForm(id);
       if (act === "deleteService") return deleteService(id);
-      if (act === "addProductForm") return openAddProductForm(); // админ
     });
 
     // лайв-валидация формы
@@ -359,6 +358,7 @@
       adminBar.addEventListener("click", (e) => {
         const b = e.target.closest("button[data-act]");
         if (!b) return;
+        e.stopPropagation();
         const act = b.dataset.act;
         if (act === "addProductForm") return openAddProductForm();
 
@@ -503,7 +503,9 @@
 
   // ===== Админ: добавить товар =====
   function openAddProductForm() {
+    if (document.getElementById("overlay-add-product")) return;
     const overlay = document.createElement("div");
+    overlay.id = "overlay-add-product";
     overlay.className = "overlay";
     overlay.innerHTML = `
       <div class="overlay__inner">
