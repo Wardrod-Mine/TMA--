@@ -37,6 +37,21 @@
 .btn--secondary{ background:transparent; color:var(--fg); border-color:var(--border); }
 .btn-block{ width:100%; }
 
+.item{
+  display:block;
+  padding:10px 12px;
+  border:1px solid var(--border, #e5e7eb);
+  border-radius:10px;
+  background: var(--bg, #fff);
+  color: var(--fg, #111);
+  cursor:pointer;
+  text-align:center;
+  transition: transform .05s ease, filter .15s ease;
+}
+.item:hover{ filter: brightness(1.05); }
+.item:active{ transform: translateY(1px); }
+.item:focus-visible{ outline: 2px solid rgba(0,0,0,.2); outline-offset: 2px; }
+
 /* overlay gallery — фикс альфа-канала и контраста текста */
 .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6);  /* FIX: .6 */
   display:grid; place-items:center; z-index:9999; padding:16px; }

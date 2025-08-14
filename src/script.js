@@ -293,7 +293,8 @@
       .filter(b => b.toLowerCase().includes(filter.trim().toLowerCase()));
 
     brands.forEach(b => {
-      const el = document.createElement("div");
+      const el = document.createElement("button");
+      el.type = "button";
       el.className = "item text-center";
       el.textContent = b;
       el.addEventListener("click", () => {
@@ -311,7 +312,8 @@
     models
       .filter(m => m.toLowerCase().includes(filter.trim().toLowerCase()))
       .forEach(m => {
-        const el = document.createElement("div");
+        const el = document.createElement("button");
+        el.type = "button";
         el.className = "item text-center";
         el.textContent = m;
         el.addEventListener("click", () => {
