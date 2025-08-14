@@ -355,28 +355,27 @@
         </div>
 
         <div class="grid grid-cols-2 gap-2 mt-3">
-          <button class="btn btn-block" data-act="lead" data-id="${srv.id}">
+          <button class="btn btn-block btn--pill btn-sm" data-act="lead" data-id="${srv.id}">
             Оставить заявку
           </button>
-          <button class="btn btn-block" data-act="viewPhotos" data-id="${srv.id}">
+          <button class="btn btn-block btn--pill btn-sm" data-act="viewPhotos" data-id="${srv.id}">
             Посмотреть фото автомобиля
           </button>
         </div>
 
         ${IS_ADMIN ? `
         <div class="mt-2">
-          <button class="btn btn--secondary btn-block" data-act="addPhoto" data-id="${srv.id}">
+          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="addPhoto" data-id="${srv.id}">
             Добавить фото
           </button>
-        </div>` : ``}
-      `;
+        </div>` : ``}`;
       serviceCards.appendChild(el);
     });
 
 
     // Общая заявка по категории/модели
     const general = document.createElement("button");
-    general.className = "btn btn-block mt-2";
+    general.className = "btn btn-block btn--pill btn-lg mt-2";
     general.textContent = "Оставить общую заявку по этой услуге";
     general.dataset.act = "lead";
     general.dataset.id = "general";

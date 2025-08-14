@@ -1,63 +1,47 @@
-:root {
-  --bg: #f3f4f6; --fg: #111827; --muted:#6b7280; --accent:#2563eb; --border:#d1d5db;
-}
-*{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg)}
-
-.inp{
-  width:100%; padding:10px 12px; border-radius:8px;
-  border:1px solid var(--border); background:#fff;
+:root{
+  /* делаем акцент цветом Telegram, как на скрине */
+  --accent: var(--tg-theme-button-color, #2aabee);        /* NEW: синий Telegram */
+  --accent-text: var(--tg-theme-button-text-color, #fff); /* NEW: белый текст */
 }
 
+/* базовая акцентная кнопка */
 .btn{
   display:inline-flex; align-items:center; justify-content:center;
-  padding:12px 16px; border-radius:12px; font-weight:600;
-  border:1px solid transparent; background:var(--accent); color:#fff; cursor:pointer;
-  transition:transform .05s ease;
+  height:40px;                   /* NEW: фиксируем высоту как у Telegram */
+  padding:0 16px;                /* NEW */
+  border-radius:14px;            /* NEW: скругление как на скрине */
+  font-weight:600; font-size:14px; line-height:1;
+  border:1px solid transparent;
+  background:var(--accent); color:var(--accent-text);
+  cursor:pointer; transition:transform .05s ease;
+  position:relative; overflow:hidden;                     /* для затемнения */
 }
 
-/* немного затемняем все акцентные .btn */
-.btn{ position: relative; overflow: hidden; }
+/* компактная и крупная версии (для карточек и «больших» действий) */
+.btn-sm{ height:36px; padding:0 14px; font-size:14px; }   /* NEW */
+.btn-lg{ height:44px; padding:0 18px; font-size:15px; }   /* NEW */
+
+/* полностью круглая «пилюля» */
+.btn--pill{ border-radius:9999px; }                        /* NEW */
+
+/* лёгкое затемнение, чтобы цвет был чуть темнее */
 .btn::before{
-  content:"";
-  position:absolute; inset:0; border-radius:inherit;
-  background: rgba(0,0,0,.08);           /* лёгкое затемнение */
-  pointer-events:none;
+  content:""; position:absolute; inset:0; border-radius:inherit;
+  background: rgba(0,0,0,.08); pointer-events:none;       /* FIX: .08 */
 }
-.btn:hover::before{ background: rgba(0,0,0,.12); }
-.btn:active::before{ background: rgba(0,0,0,.18); }
-
-.card{
-  border:1px solid var(--border); border-radius:12px; background:#ffffff;
-  padding:12px;
-}
+.btn:hover::before{ background: rgba(0,0,0,.12); }        /* FIX: .12 */
+.btn:active::before{ background: rgba(0,0,0,.18); }       /* FIX: .18 */
 
 .btn:active{ transform: translateY(1px); }
 .btn:disabled{ opacity:.5; cursor:not-allowed; }
 .btn--secondary{ background:transparent; color:var(--fg); border-color:var(--border); }
 .btn-block{ width:100%; }
 
-/* Карточки/элементы — без изменений, но можно оставить для аккуратности */
-.item{ padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; }
-.item:active{transform:translateY(1px)}
-
-@media (prefers-color-scheme: dark){
-  :root{--bg:#0b0c10; --fg:#ffffff; --muted:#9ca3af; --border:#1f2937}
-  .inp{background:#111317; border-color:#1f2937}
-  .card,.item{background:#111317; border-color:#1f2937}
-}
-
-#errorText{
-  min-height: 44px;     /* стартовая высота ~2 строки */
-  max-height: 120px;    /* не распухает слишком сильно */
-  resize: vertical;     /* можно вручную тянуть, если нужно */
-}
-
-/* overlay gallery */
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 9999; padding: 16px; }
-.overlay__inner { background: var(--bg, #111827); color: var(--fg);
-  max-width: 960px; width: 100%; border-radius: 12px; padding: 12px; }
-.overlay__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; }
-.overlay__grid img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
-.overlay__close { width: 100%; margin-top: 8px; }
-.btn:focus-visible{ outline: 2px solid rgba(0,0,0,.25); outline-offset: 2px; }
+/* overlay gallery — фикс альфа-канала и контраста текста */
+.overlay{ position:fixed; inset:0; background:rgba(0,0,0,.6);  /* FIX: .6 */
+  display:grid; place-items:center; z-index:9999; padding:16px; }
+.overlay__inner{ background:var(--bg, #111827); color:var(--fg);  /* FIX: var(--fg) */
+  max-width:960px; width:100%; border-radius:12px; padding:12px; }
+.overlay__grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:8px; }
+.overlay__grid img{ width:100%; height:100%; object-fit:cover; border-radius:8px; }
+.overlay__close{ width:100%; margin-top:8px; }
