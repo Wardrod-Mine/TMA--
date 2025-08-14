@@ -57,6 +57,7 @@
       IS_ADMIN = !!j.admin;
       if (IS_ADMIN && userInfo) userInfo.textContent = (userInfo.textContent || "") + " • admin";
       if (IS_ADMIN && state.step === "categories") renderCategories();
+      if (IS_ADMIN && state.step === "services") renderServices();
     } catch {}
   })();
 
