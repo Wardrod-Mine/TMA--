@@ -31,6 +31,10 @@
   const formSummary = document.getElementById("formSummary");
   const sendBtn = document.getElementById("sendBtn");
 
+  // какие категории скрываем из каталога
+  const HIDDEN_CATEGORIES = new Set(["electrics", "bluetooth"]);
+
+
   // State
   const state = {
     step: "categories",
@@ -71,7 +75,12 @@
 
     // Load data
     const res = await fetch("./data/catalog.json");
-    state.catalog = await res.json();
+    state.catalog = await res.json();// полностью убираем скрытые категории и все их услуги
+    state.catalog.categories = state.catalog.categories
+      .filter(c => !HIDDEN_CATEGORIES.has(c.code));
+    state.catalog.services = state.catalog.services
+      .filter(s => !HIDDEN_CATEGORIES.has(s.category))
+
 
     renderCategories();
     wireCommon();
@@ -246,29 +255,35 @@
     }
   }
 
-  // Screens
   function renderCategories() {
     sCategories.innerHTML = "";
-    state.catalog.categories.forEach(cat => {
-      const el = document.createElement("button");
-      el.className = "card w-full text-left";
-      el.innerHTML = `
-        <div class="flex items-center justify-between">
-          <div>
-            <div class="font-semibold">${cat.title}</div>
-            <div class="text-sm opacity-75">${cat.desc || ""}</div>
+
+    state.catalog.categories
+      .filter(cat => !HIDDEN_CATEGORIES.has(cat.code)) // фильтруем лишние
+      .forEach(cat => {
+        const el = document.createElement("button");
+        el.className = "card w-full text-left";
+        el.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-semibold">${cat.title}</div>
+              <div class="text-sm opacity-75">${cat.desc || ""}</div>
+            </div>
+            <div class="text-right text-sm opacity-80">от ${formatPrice(cat.from)}</div>
           </div>
-          <div class="text-right text-sm opacity-80">от ${formatPrice(cat.from)}</div>
-        </div>
-        ${cat.restricted ? '<div class="mt-2 text-xs text-amber-600 dark:text-amber-300">⚠️ Может иметь юридические ограничения</div>' : ""}
-      `;
-      el.addEventListener("click", () => {
-        state.selection.category = cat;
-        renderBrands();
-        showScreen("brands");
+          ${cat.restricted 
+            ? '<div class="mt-2 text-xs text-amber-600 dark:text-amber-300">⚠️ Может иметь юридические ограничения</div>' 
+            : ""
+          }
+        `;
+        el.addEventListener("click", () => {
+          state.selection.category = cat;
+          renderBrands();
+          showScreen("brands");
+        });
+        sCategories.appendChild(el);
       });
-      sCategories.appendChild(el);
-    });
+
     showScreen("categories");
   }
 
@@ -309,6 +324,10 @@
   }
 
   function renderServices() {
+    if (HIDDEN_CATEGORIES.has(state.selection.category?.code)) {
+      tg?.showAlert?.("Этот раздел временно недоступен");
+      return showScreen("categories");
+    }
     serviceCards.innerHTML = "";
     const restrictedCat = !!state.selection.category.restricted;
     legalNotice.classList.toggle("hidden", !restrictedCat);
