@@ -57,15 +57,25 @@
     </section>
   </main>
 
-  <footer class="max-w-3xl mx-auto px-4 py-4 border-t border-gray-200 dark:border-gray-800">
-    <button id="closeApp" class="btn btn--secondary">Закрыть</button>
-  </footer>
+  <section class="max-w-3xl mx-auto px-4 pt-2 pb-3">
+  <label for="errorText" class="block text-sm opacity-70 mb-2">
+    Опишите проблему
+  </label>
+  <textarea id="errorText" rows="4"
+    class="w-full rounded-lg px-3 py-2 border border-gray-300/40 dark:border-gray-700/60 bg-transparent"
+    placeholder="Что делали? Что ожидали? Что получилось?"></textarea>
+  <p class="mt-2 text-xs opacity-60">
+    Отправим: URL, платформу, шаг/выбор, и последнюю ошибку/стек (если поймана).
+  </p>
+</section>
 
   <footer class="max-w-3xl mx-auto px-4 py-4 border-t border-gray-200 dark:border-gray-800">
-    <div class="flex gap-2">
-      <button id="errorBtn" class="btn btn--secondary">Сообщить об ошибке</button>
+    <div class="grid grid-cols-2 gap-2">
+      <button id="errorBtn" class="btn btn-block">Сообщить об ошибке</button>
+      <button id="closeApp" class="btn btn-block">Закрыть</button>
     </div>
   </footer>
+
 
 
   <script src="./src/script.js"></script>

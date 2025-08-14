@@ -39,6 +39,8 @@
     history: []
   };
 
+
+  
   // Init
   init();
   async function init() {
@@ -72,16 +74,10 @@
       const prev = state.history.pop();
       showScreen(prev, /*fromBack*/ true);
     });
+
     brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
     modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
 
-    // ⬇️ Лайв-валидация: на ввод в полях и переключение чекбокса
-    [fName, fPhone, fCity, fComment].forEach(el => {
-      el.addEventListener("input", validateForm);
-    });
-    if (legalCheckbox) legalCheckbox.addEventListener("change", validateForm);
-
-    // ⬇️ НОВОЕ: лайв-валидация формы
     [fName, fPhone, fCity, fComment].forEach(el => {
       el.addEventListener("input", validateForm);
     });
@@ -89,6 +85,7 @@
 
     sendBtn.addEventListener("click", onSubmit);
   }
+
   // === ERROR REPORTING ===
   let lastError = null;
 
@@ -115,7 +112,7 @@
     const u = tg?.initDataUnsafe?.user;
     return {
       ts: new Date().toISOString(),
-      url: location.href,
+      // url: location.href,            // ← УДАЛЕНО, ссылку не шлём
       appStep: state.step,
       selection: state.selection,
       platform: tg?.platform || "web",
@@ -127,21 +124,12 @@
     };
   }
 
-  async function postErrorReport(payload) {
-    const initData = tg?.initData || "";
-    const res = await fetch(`${BACKEND_URL}/report-error`, {  // BACKEND_URL уже есть в файле
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Telegram-Init-Data": initData
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error(await res.text().catch(()=>"send failed"));
-  }
+
+
 
   function onReportClick() {
-    const summary = "Отправим: URL, платформу, шаг/выбор, user_id (если есть), и последнюю ошибку (если поймана).";
+    const detailsEl = document.getElementById("errorText");
+    const summary = "Отправим: платформу, шаг/выбор, user_id и последнюю ошибку (если поймана). Без ссылки на страницу.";
     if (tg?.showPopup) {
       tg.showPopup({
         title: "Сообщить об ошибке?",
@@ -157,10 +145,18 @@
 
     async function doSend() {
       try {
+        const details = detailsEl ? detailsEl.value.trim() : "";
         tg?.HapticFeedback.impactOccurred("light");
-        await postErrorReport({ kind: "error_report", debug: collectDebug() });
+
+        await postErrorReport({
+          kind: "error_report",
+          details,                      // <-- ТВОЙ ТЕКСТ
+          debug: collectDebug({ note: details || undefined })
+        });
+
         tg?.HapticFeedback.notificationOccurred("success");
         tg?.showAlert?.("Спасибо! Отчёт отправлен.");
+        if (detailsEl) detailsEl.value = ""; // очистим поле
         lastError = null;
       } catch (e) {
         console.warn(e);
@@ -170,6 +166,18 @@
     }
   }
 
+  async function postErrorReport(payload) {
+    const initData = tg?.initData || "";
+    const res = await fetch(`${BACKEND_URL}/report-error`, {  // BACKEND_URL уже есть в файле
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": initData
+      },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(await res.text().catch(()=>"send failed"));
+  }
 
   function showScreen(name, fromBack = false) {
     // remember current step for back
@@ -360,6 +368,31 @@
       alert("Не удалось отправить заявку. Попробуйте позже.");
     }
   }
+  // === phone validation ===
+  // Регион берём из языка Telegram (ru/uk/kk/be) → RU/UA/KZ/BY, иначе GLOBAL.
+  function detectRegion() {
+    const lang = (tg?.initDataUnsafe?.user?.language_code || "").toLowerCase();
+    if (lang.startsWith("ru")) return "RU";
+    if (lang.startsWith("kk")) return "KZ";
+    if (lang.startsWith("uk")) return "UA";
+    if (lang.startsWith("be")) return "BY";
+    return "RU"; // по умолчанию
+  }
+  function validatePhoneByRegion(value, region = "RU") {
+    const digits = value.replace(/\D/g, "");
+    switch (region) {
+      case "RU": // мобильные: +7 9xx xxx-xx-xx, допускаем ведущие 8/7/+7
+        return /^9\d{9}$/.test(digits) || /^79\d{9}$/.test(digits) || /^89\d{9}$/.test(digits);
+      case "KZ": // Казахстан: +7 7xx xxx-xx-xx
+        return /^77\d{8}$/.test(digits) || /^7?7\d{9}$/.test(digits);
+      case "UA": // Украина: +380 xx xxx-xx-xx (мобилки 39/50/63/66/67/68/73/89/91/92/93/94/95/96/97/98/99)
+        return /^(380(39|50|63|66|67|68|73|89|91|92|93|94|95|96|97|98|99)\d{7})$/.test(digits);
+      case "BY": // Беларусь: +375 xx xxx-xx-xx (25/29/33/44)
+        return /^(375(25|29|33|44)\d{7})$/.test(digits);
+      default:  // E.164 упрощённо
+        return /^\+?[1-9]\d{9,14}$/.test(value.replace(/\s/g, ""));
+    }
+  }
 
   // Helpers
   function validateForm() {
@@ -367,17 +400,22 @@
     const okLegal = !restricted || legalCheckbox.checked;
 
     const okName = fName.value.trim().length >= 2;
-    const okPhone = /^\+?\d[\d\s\-()]{7,}$/.test(fPhone.value.trim());
+    const region = detectRegion();
+    const okPhone = validatePhoneByRegion(fPhone.value.trim(), region);
+
     const valid = okName && okPhone && okLegal;
 
-    if (!tg) sendBtn.disabled = false;
+    // вне Telegram — блокируем кнопку, пока форма невалидна
+    if (!tg) sendBtn.disabled = !valid;
+
     if (tg) {
       tg.MainButton.setParams({ text: "Отправить заявку" });
       tg.MainButton[valid ? "show" : "hide"]();
     }
-
     return valid;
   }
+
+
 
 
   function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
