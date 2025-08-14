@@ -85,9 +85,25 @@
       .filter(c => !HIDDEN_CATEGORIES.has(c.code));
     state.catalog.services = state.catalog.services
       .filter(s => !HIDDEN_CATEGORIES.has(s.category))
+
+    // подмешиваем правки/удаления из бэка
+    try {
+      const r = await fetch(`${BACKEND_URL}/services`);
+      const j = await r.json();
+      if (j?.ok) {
+        const updates = j.updates || {};
+        const deleted = new Set(j.deleted || []);
+        state.catalog.services = (state.catalog.services || []).filter(s => !deleted.has(s.id));
+        state.catalog.services = state.catalog.services.map(
+          s => updates[s.id] ? { ...s, ...updates[s.id] } : s
+        );
+      }
+    } catch (e) { console.warn("services overrides fetch failed", e); }
+
     renderCategories();
     wireCommon();
   }
+
   //if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
     sCategories.addEventListener("click", (e) => {
@@ -122,6 +138,8 @@
       }
       if (act === "viewPhotos") return viewPhotos(id);
       if (act === "addPhoto") return addPhoto(id);
+      if (act === "editService") return openEditServiceForm(id);
+      if (act === "deleteService") return deleteService(id);
     });
     backBtn.addEventListener("click", () => {
       if (!state.history.length) return;
@@ -438,6 +456,12 @@
           <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="addPhoto" data-id="${srv.id}">
             Добавить фото
           </button>
+          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="editService" data-id="${srv.id}">
+            Редактировать
+          </button>
+          <button class="btn btn--secondary btn-block btn--pill btn-sm" data-act="deleteService" data-id="${srv.id}">
+            Удалить
+          </button>
         </div>` : ``}`;
       serviceCards.appendChild(el);
     });
@@ -659,5 +683,92 @@ async function onAskSend() {
     if (tp?.link_color) root.style.setProperty("--accent", tp.link_color);
     if (tp?.section_separator_color) root.style.setProperty("--border", tp.section_separator_color);
   }
+
+  function openEditServiceForm(id) {
+    const srv = (state.catalog.services || []).find(s => s.id === id);
+    if (!srv) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="overlay__inner">
+        <div class="font-semibold mb-2">Редактировать услугу</div>
+        <div class="grid gap-2">
+          <input id="es_title" class="inp" placeholder="Название" value="${(srv.title||"").replace(/"/g, "&quot;")}" />
+          <input id="es_price" class="inp" type="number" min="0" step="1" placeholder="Цена от, ₽" value="${Number(srv.price_from||0)}" />
+          <input id="es_duration" class="inp" placeholder="Время (например: 1–2 ч.)" value="${srv.duration ? srv.duration.replace(/"/g, "&quot;") : ""}" />
+          <textarea id="es_desc" class="inp" rows="3" placeholder="Описание">${srv.desc ? srv.desc : ""}</textarea>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button class="btn btn--pill btn-lg" id="es_save">Сохранить</button>
+          <button class="btn btn--secondary btn--pill btn-lg overlay__close">Отмена</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
+    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+
+    overlay.querySelector("#es_save").onclick = async () => {
+      const patch = {
+        title: overlay.querySelector("#es_title").value.trim(),
+        price_from: Number(overlay.querySelector("#es_price").value),
+        duration: overlay.querySelector("#es_duration").value.trim(),
+        desc: overlay.querySelector("#es_desc").value.trim()
+      };
+      if (!patch.title || !Number.isFinite(patch.price_from) || patch.price_from < 0) {
+        return tg?.showAlert?.("Заполните название и корректную цену");
+      }
+      try {
+        tg?.MainButton.setParams({ text: "Сохраняем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+        const res = await fetch(`${BACKEND_URL}/services/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": tg?.initData || ""
+          },
+          body: JSON.stringify(patch)
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || !j?.ok) throw new Error(j?.error || "save failed");
+
+        // применим патч локально и перерисуем
+        const i = state.catalog.services.findIndex(s => s.id === id);
+        if (i >= 0) state.catalog.services[i] = { ...state.catalog.services[i], ...patch };
+        overlay.remove();
+        renderServices();
+        tg?.HapticFeedback.notificationOccurred("success");
+      } catch (e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось сохранить");
+      } finally {
+        tg?.MainButton.hide();
+      }
+    };
+  }
+
+  async function deleteService(id) {
+    if (!confirm("Удалить эту услугу?")) return;
+    try {
+      tg?.MainButton.setParams({ text: "Удаляем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+      const res = await fetch(`${BACKEND_URL}/services/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+        headers: { "X-Telegram-Init-Data": tg?.initData || "" }
+      });
+      const j = await res.json().catch(()=>null);
+      if (!res.ok || !j?.ok) throw new Error(j?.error || "delete failed");
+      // убираем из локального списка
+      state.catalog.services = (state.catalog.services || []).filter(s => s.id !== id);
+      renderServices();
+      tg?.HapticFeedback.notificationOccurred("success");
+    } catch (e) {
+      console.warn(e);
+      tg?.HapticFeedback.notificationOccurred("error");
+      tg?.showAlert?.("Не удалось удалить");
+    } finally {
+      tg?.MainButton.hide();
+    }
+  }
+
 
 })();
