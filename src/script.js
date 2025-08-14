@@ -56,6 +56,7 @@
       const j = await res.json();
       IS_ADMIN = !!j.admin;
       if (IS_ADMIN && userInfo) userInfo.textContent = (userInfo.textContent || "") + " • admin";
+      if (IS_ADMIN && state.step === "categories") renderCategories();
     } catch {}
   })();
 
@@ -74,6 +75,7 @@
     } else {
       console.warn("Dev mode: Telegram.WebApp не найден");
       userInfo.textContent = "Dev mode";
+      IS_ADMIN = true;
     }
 
     // Load data
@@ -292,7 +294,7 @@
         adminBar.innerHTML = `
           <div class="font-semibold">Управление товарами</div>
           <div class="mt-2">
-            <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить товар</button>
+            <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить услугу</button>
           </div>`;
         sCategories.appendChild(adminBar);
       }
