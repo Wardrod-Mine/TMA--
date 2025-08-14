@@ -39,6 +39,18 @@
     history: []
   };
 
+  // === admin flag ===
+  let IS_ADMIN = false;
+  (async function detectAdmin() {
+    try {
+      const res = await fetch(`${BACKEND_URL}/me`, {
+        headers: { "X-Telegram-Init-Data": tg?.initData || "" }
+      });
+      const j = await res.json();
+      IS_ADMIN = !!j.admin;
+      if (IS_ADMIN && userInfo) userInfo.textContent = (userInfo.textContent || "") + " • admin";
+    } catch {}
+  })();
 
   
   // Init
@@ -78,7 +90,20 @@
 
     closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
     errorBtn?.addEventListener("click", onReportClick);
-
+    serviceCards.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const act = btn.dataset.act;
+      if (act === "lead") {
+        const srv = (state.catalog?.services || []).find(s => s.id === id);
+        if (!srv) return;
+        state.selection.service = srv;
+        showScreen("form");
+      }
+      if (act === "viewPhotos") return viewPhotos(id);
+      if (act === "addPhoto") return addPhoto(id);
+    });
     backBtn.addEventListener("click", () => {
       if (!state.history.length) return;
       const prev = state.history.pop();
@@ -87,6 +112,8 @@
 
     brandSearch.addEventListener("input", () => renderBrands(brandSearch.value));
     modelSearch.addEventListener("input", () => renderModels(modelSearch.value));
+    // клики по кнопкам внутри карточек услуг
+
 
     [fName, fPhone, fCity, fComment].forEach(el => {
       el.addEventListener("input", validateForm);
@@ -294,7 +321,9 @@
     );
 
     if (!list.length) {
-      serviceCards.innerHTML = `<div class="text-sm opacity-70">Пока нет преднастроенных карточек для этой модели. Вы можете всё равно оставить заявку на общую услугу.</div>`;
+      serviceCards.innerHTML = `<div class="text-sm opacity-70">
+        Пока нет преднастроенных карточек для этой модели. Вы можете всё равно оставить заявку на общую услугу.
+      </div>`;
     }
 
     list.forEach(srv => {
@@ -302,22 +331,35 @@
       el.className = "card";
       el.innerHTML = `
         <div class="font-semibold">${srv.title}</div>
-        <div class="text-sm opacity-80 mt-1">Стоимость: от ${formatPrice(srv.price_from)} • Время: ${srv.duration || "—"}</div>
-        <div class="mt-2">
-          <button class="btn btn-block" data-id="${srv.id}">Оставить заявку</button>
+        <div class="text-sm opacity-80 mt-1">
+          Стоимость: от ${formatPrice(srv.price_from)} • Время: ${srv.duration || "—"}
         </div>
+
+        <div class="grid grid-cols-2 gap-2 mt-3">
+          <button class="btn btn-block" data-act="lead" data-id="${srv.id}">
+            Оставить заявку
+          </button>
+          <button class="btn btn--secondary" data-act="viewPhotos" data-id="${srv.id}">
+            Посмотреть фото автомобиля
+          </button>
+        </div>
+
+        ${IS_ADMIN ? `
+        <div class="mt-2">
+          <button class="btn btn--secondary btn-block" data-act="addPhoto" data-id="${srv.id}">
+            Добавить фото
+          </button>
+        </div>` : ``}
       `;
-      el.querySelector("button").addEventListener("click", () => {
-        state.selection.service = srv;
-        showScreen("form");
-      });
       serviceCards.appendChild(el);
     });
 
-    // Позволяем оставить «общую» заявку по категории/модели даже без карточки
+    // Общая заявка по категории/модели
     const general = document.createElement("button");
-    general.className = "btn btn-block";
+    general.className = "btn btn-block mt-2";
     general.textContent = "Оставить общую заявку по этой услуге";
+    general.dataset.act = "lead";
+    general.dataset.id = "general";
     general.addEventListener("click", () => {
       state.selection.service = {
         id: "general",
@@ -329,6 +371,67 @@
       showScreen("form");
     });
     serviceCards.appendChild(general);
+  }
+
+  async function viewPhotos(serviceId) {
+  try {
+    const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`);
+    const j = await res.json();
+    const items = (j.items || []).slice(0, 20);
+    if (!items.length) {
+      return tg?.showAlert?.("Фото пока нет.") || alert("Фото пока нет.");
+    }
+
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="overlay__inner">
+        <div class="overlay__grid">
+          ${items.map(x => `<img src="${BACKEND_URL}${x.url}" alt="" loading="lazy">`).join("")}
+        </div>
+        <button class="btn overlay__close">Закрыть</button>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
+    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+  } catch (e) {
+    console.warn(e);
+    tg?.showAlert?.("Не удалось загрузить фото") || alert("Не удалось загрузить фото");
+  }
+}
+
+  async function addPhoto(serviceId) {
+    if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору") || alert("Доступно только администратору");
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        tg?.MainButton.setParams({ text: "Загрузка фото…" });
+        tg?.MainButton.show(); tg?.MainButton.disable();
+
+        const fd = new FormData();
+        fd.append("photo", file, file.name || "photo.jpg");
+        const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`, {
+          method: "POST",
+          headers: { "X-Telegram-Init-Data": tg?.initData || "" },
+          body: fd
+        });
+        if (!res.ok) throw new Error(await res.text().catch(()=>"upload failed"));
+
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Фото добавлено ✅") || alert("Фото добавлено ✅");
+      } catch (e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось загрузить фото") || alert("Не удалось загрузить фото");
+      } finally {
+        tg?.MainButton.hide();
+      }
+    };
+    input.click();
   }
 
   function updateFormSummary() {

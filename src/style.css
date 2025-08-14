@@ -28,7 +28,6 @@ body{background:var(--bg);color:var(--fg)}
 
 /* Карточки/элементы — без изменений, но можно оставить для аккуратности */
 .item{ padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:#fff; cursor:pointer; }
-.item:active{ transform:translateY(1px); }
 .item:active{transform:translateY(1px)}
 
 @media (prefers-color-scheme: dark){
@@ -37,13 +36,16 @@ body{background:var(--bg);color:var(--fg)}
   .card,.item{background:#111317; border-color:#1f2937}
 }
 
-.btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
-
 #errorText{
   min-height: 44px;     /* стартовая высота ~2 строки */
   max-height: 120px;    /* не распухает слишком сильно */
   resize: vertical;     /* можно вручную тянуть, если нужно */
 }
+
+/* overlay gallery */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: grid; place-items: center; z-index: 9999; padding: 16px; }
+.overlay__inner { background: var(--bg, #111827);
+  color: var(--fg); max-width: 960px; width: 100%; border-radius: 12px; padding: 12px; }
+.overlay__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 8px; }
+.overlay__grid img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.overlay__close { width: 100%; margin-top: 8px; }
