@@ -107,12 +107,6 @@
 
   //if (sendBtn) sendBtn.disabled = false;
   function wireCommon() {
-    sCategories.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act='addProductForm']");
-      if (!btn) return;
-      if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору");
-      openAddProductForm();
-    });
     askBtn?.addEventListener("click", onAskSend);
     const detailsEl = document.getElementById("errorText");
     if (detailsEl) {
@@ -123,6 +117,13 @@
       clamp();                            // выставить стартовую высоту
       detailsEl.addEventListener("input", clamp);
     }
+    sCategories.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act='addProductForm']");
+      if (!btn) return;
+      if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору");
+      openAddProductForm();
+    });
+
 
     closeBtn.addEventListener("click", () => tg ? tg.close() : window.close());
     errorBtn?.addEventListener("click", onReportClick);
@@ -313,7 +314,7 @@
         adminBar.innerHTML = `
           <div class="font-semibold">Управление товарами</div>
           <div class="mt-2">
-            <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить услугу</button>
+            <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить товар</button>
           </div>`;
         sCategories.appendChild(adminBar);
       }
@@ -557,8 +558,8 @@
   // Submit
   async function onSubmit() {
     if (!validateForm()) {
-      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.\nДля некоторых услуг требуется подтвердить законность.");
-      else alert("Заполните имя и телефон. Для некоторых услуг требуется подтвердить законность.");
+      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
+      else alert("Заполните имя и телефон.");
       return;
     }
 
@@ -769,6 +770,62 @@ async function onAskSend() {
     } finally {
       tg?.MainButton.hide();
     }
+  }
+  function openAddProductForm() {
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="overlay__inner">
+        <div class="font-semibold mb-2">Новый товар</div>
+        <div class="grid gap-2">
+          <input id="ap_title" class="inp" placeholder="Название товара"/>
+          <input id="ap_price" class="inp" placeholder="Цена от, ₽" type="number" min="0" step="1"/>
+          <textarea id="ap_desc" class="inp" rows="3" placeholder="Краткое описание"></textarea>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button class="btn btn--pill btn-lg" id="ap_save">Сохранить</button>
+          <button class="btn btn--secondary btn--pill btn-lg overlay__close">Отмена</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
+    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+
+    overlay.querySelector("#ap_save").onclick = async () => {
+      const title = overlay.querySelector("#ap_title").value.trim();
+      const price_from = Number(overlay.querySelector("#ap_price").value);
+      const desc = overlay.querySelector("#ap_desc").value.trim();
+      if (!title || !Number.isFinite(price_from) || price_from < 0) {
+        return tg?.showAlert?.("Заполните название и корректную цену");
+      }
+      try {
+        tg?.MainButton.setParams({ text: "Сохраняем…" });
+        tg?.MainButton.show(); tg?.MainButton.disable();
+
+        const res = await fetch(`${BACKEND_URL}/products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": tg?.initData || ""
+          },
+          body: JSON.stringify({ title, price_from, desc })
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || !j?.ok) throw new Error(j?.error || "save failed");
+
+        overlay.remove();
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Товар сохранён ✅");
+        // Можно сразу предложить добавить фото к товару:
+        // addPhoto(j.item.id);
+      } catch (e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось сохранить товар");
+      } finally {
+        tg?.MainButton.hide();
+      }
+    };
   }
 
 
