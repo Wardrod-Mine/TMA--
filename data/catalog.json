@@ -9,6 +9,9 @@
     { "code": "tuning", "title": "Чип-тюнинг / DPF / EGR / AdBlue", "from": 9000, "desc": "Stage, отключение DPF/EGR/AdBlue, катализаторы (юр. ограничения)", "restricted": true },
     { "code": "retrofit", "title": "Дооснащение", "from": 5000, "desc": "Камеры, CarPlay/Android Auto, ШГУ и пр.", "restricted": false }
   ],
+  "products": [
+  { "id": "obd2_bt", "title": "OBD2 Bluetooth адаптер", "price_from": 1500, "desc": "Диагностика по Bluetooth (Android/iOS).", "images": [] }],
+
   "brands": [
     "Audi","BMW","Mercedes-Benz","Lexus","Toyota","Volkswagen","Kia","Hyundai",
     "Geely","Chery","Haval","Land Rover","Porsche","Volvo","Jeep","Chevrolet",

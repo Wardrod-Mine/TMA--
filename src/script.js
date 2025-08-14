@@ -35,7 +35,7 @@
   const sendBtn = document.getElementById("sendBtn");
 
   // какие категории скрываем из каталога
-  const HIDDEN_CATEGORIES = new Set(["electrics", "bluetooth"]);
+  const HIDDEN_CATEGORIES = new Set(["electrics", "bluetooth", "products"]);
 
 
   // State
@@ -83,8 +83,6 @@
       .filter(c => !HIDDEN_CATEGORIES.has(c.code));
     state.catalog.services = state.catalog.services
       .filter(s => !HIDDEN_CATEGORIES.has(s.category))
-
-
     renderCategories();
     wireCommon();
   }
@@ -261,7 +259,6 @@
 
   function renderCategories() {
     sCategories.innerHTML = "";
-
     state.catalog.categories
       .filter(cat => !HIDDEN_CATEGORIES.has(cat.code)) // фильтруем лишние
       .forEach(cat => {
@@ -593,4 +590,5 @@ async function onAskSend() {
     if (tp?.link_color) root.style.setProperty("--accent", tp.link_color);
     if (tp?.section_separator_color) root.style.setProperty("--border", tp.section_separator_color);
   }
+
 })();
