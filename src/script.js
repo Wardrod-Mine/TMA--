@@ -251,25 +251,6 @@
       });
       sCategories.appendChild(el);
     });
-
-    // Админ-панель на главном — Добавить услугу
-    if (IS_ADMIN) {
-      const adminBar = document.createElement("div");
-      adminBar.className = "card mt-2";
-      adminBar.innerHTML = `
-        <div class="font-semibold">Управление услугами</div>
-        <div class="mt-2">
-          <button class="btn btn--pill btn-sm" data-act="addServiceForm">Добавить услугу</button>
-        </div>`;
-      sCategories.appendChild(adminBar);
-
-      adminBar.addEventListener("click", (e) => {
-        const b = e.target.closest("button[data-act]");
-        if (!b) return;
-        e.stopPropagation();
-        if (b.dataset.act === "addServiceForm") openAddServiceForm();
-      });
-    }
   }
 
   function renderBrands(filter = "") {
