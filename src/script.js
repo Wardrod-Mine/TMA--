@@ -88,16 +88,26 @@
     state.catalog.services   = (state.catalog.services   || []).filter(s => !HIDDEN_CATEGORIES.has(s.category));
 
     // Подмешиваем правки/удаления услуг с бэка
+    // Подмешиваем правки/удаления услуг + добавляем новые, созданные на бэке
     try {
       const r = await fetch(`${BACKEND_URL}/services`);
       const j = await r.json();
       if (j?.ok) {
         const updates = j.updates || {};
         const deleted = new Set(j.deleted || []);
-        state.catalog.services = (state.catalog.services || []).filter(s => !deleted.has(s.id));
-        state.catalog.services = state.catalog.services.map(
-          s => updates[s.id] ? { ...s, ...updates[s.id] } : s
-        );
+
+        const base = state.catalog.services || [];
+        const baseIds = new Set(base.map(s => s.id));
+
+        const updatedBase = base
+          .filter(s => !deleted.has(s.id))
+          .map(s => updates[s.id] ? { ...s, ...updates[s.id] } : s);
+
+        const addedFromServer = Object.entries(updates)
+          .filter(([id]) => !baseIds.has(id) && !deleted.has(id))
+          .map(([id, s]) => ({ id, ...s }));
+
+        state.catalog.services = [...updatedBase, ...addedFromServer];
       }
     } catch (e) { console.warn("services overrides fetch failed", e); }
 
@@ -385,7 +395,7 @@
           </div>
         ` : `<div class="text-sm opacity-75 mt-2">Для этой модели пока нет карточек услуг</div>`}
         <div class="mt-2">
-          <button class="btn btn--pill btn-sm btn-block" data-act="addProductForm">
+          <button class="btn btn--pill btn-sm btn-block" data-act="addServiceForm">
             Добавить карточку услуги
           </button>
         </div>
@@ -398,7 +408,7 @@
         if (!b) return;
         e.stopPropagation();
         const act = b.dataset.act;
-        if (act === "addProductForm") return openAddProductForm();
+        if (act === "addServiceForm") return openAddServiceForm();
 
         const select = adminBar.querySelector("#admSrvSelect");
         const id = select?.value;
@@ -617,6 +627,71 @@
     };
   }
 
+
+  // ===== Админ: добавить услугу =====
+  function openAddServiceForm() {
+    if (document.getElementById("overlay-add-service")) return;
+    const overlay = document.createElement("div");
+    overlay.id = "overlay-add-service";
+    overlay.className = "overlay";
+    overlay.innerHTML = `
+      <div class="overlay__inner">
+        <div class="font-semibold mb-2">Новая услуга</div>
+        <div class="grid gap-2">
+          <input id="as_title" class="inp" placeholder="Название услуги"/>
+          <input id="as_price" class="inp" placeholder="Цена от, ₽" type="number" min="0" step="1"/>
+          <input id="as_duration" class="inp" placeholder="Время (например: 1–2 часа)"/>
+          <textarea id="as_desc" class="inp" rows="3" placeholder="Краткое описание"></textarea>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button class="btn btn--pill btn-lg" id="as_save">Сохранить</button>
+          <button class="btn btn--secondary btn--pill btn-lg overlay__close">Отмена</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    overlay.querySelector(".overlay__close").onclick = () => overlay.remove();
+    overlay.onclick = (ev) => { if (ev.target === overlay) overlay.remove(); };
+
+    overlay.querySelector("#as_save").onclick = async () => {
+      const title     = overlay.querySelector("#as_title").value.trim();
+      const price_from= Number(overlay.querySelector("#as_price").value);
+      const duration  = overlay.querySelector("#as_duration").value.trim();
+      const desc      = overlay.querySelector("#as_desc").value.trim();
+      if (!title || !Number.isFinite(price_from) || price_from < 0) {
+        return tg?.showAlert?.("Заполните название и корректную цену");
+      }
+      const payload = {
+        category: state.selection.category.code,
+        brand: state.selection.brand,
+        model: state.selection.model,
+        title, price_from, duration, desc
+      };
+      try {
+        tg?.MainButton.setParams({ text: "Сохраняем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+        const res = await fetch(`${BACKEND_URL}/services`, {
+          method: "POST",
+          headers: { "Content-Type":"application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+          body: JSON.stringify(payload)
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || !j?.ok) throw new Error(j?.error || "save failed");
+
+        // добавим услугу локально и перерисуем список
+        state.catalog.services = state.catalog.services || [];
+        state.catalog.services.unshift(j.item);
+        overlay.remove();
+        renderServices();
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Услуга создана ✅");
+      } catch (e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось создать услугу");
+      } finally { tg?.MainButton.hide(); }
+    };
+  }
+
+
   // ===== Вопрос админу =====
   async function onAskSend() {
     const text = askText?.value.trim();
@@ -661,24 +736,6 @@
   }
 
   async function onSubmit() {
-    if (tg?.sendData) {
-      tg.sendData(JSON.stringify(payload)); // обработчик у бота уже есть
-    } else {
-      await fetch(`${BACKEND_URL}/web-data`, {  // для dev в браузере
-        method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
-      });
-    }
-
-    if (tg?.sendData) {
-      tg.sendData(JSON.stringify(payload)); // обработчик в боте уже есть
-    } else {
-      await fetch(`${BACKEND_URL}/web-data`, { // dev в браузере
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    }
-
     if (!validateForm()) {
       if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
       else alert("Заполните имя и телефон.");
@@ -701,18 +758,19 @@
 
     try {
       tg?.MainButton.setParams({ text: "Отправляем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
-      const res = await fetch(`${BACKEND_URL}/lead`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Telegram-Init-Data": tg?.initData || ""
-        },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error("lead failed");
+
+      if (tg?.sendData) {
+        tg.sendData(JSON.stringify(payload)); // бот примет web_app_data
+      } else {
+        await fetch(`${BACKEND_URL}/web-data`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      }
+
       tg?.HapticFeedback.notificationOccurred("success");
       tg?.showAlert?.("Заявка отправлена ✅") || alert("Заявка отправлена ✅");
-      // очистить форму
       [fName, fPhone, fCity, fComment].forEach(el => el && (el.value = ""));
       showScreen("categories");
     } catch (e) {
@@ -723,6 +781,7 @@
       tg?.MainButton.hide();
     }
   }
+
 
   // ===== Utils =====
   function formatPrice(n){ return new Intl.NumberFormat("ru-RU").format(n) + " ₽"; }
