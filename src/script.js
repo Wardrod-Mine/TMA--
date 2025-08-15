@@ -259,7 +259,7 @@
       adminBar.innerHTML = `
         <div class="font-semibold">Управление услугами</div>
         <div class="mt-2">
-          <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить услугу</button>
+          <button class="btn btn--pill btn-sm" data-act="addServiceForm">Добавить услугу</button>
         </div>`;
       sCategories.appendChild(adminBar);
 
@@ -267,7 +267,7 @@
         const b = e.target.closest("button[data-act]");
         if (!b) return;
         e.stopPropagation();
-        if (b.dataset.act === "addProductForm") openAddProductForm();
+        if (b.dataset.act === "addServiceForm") openAddServiceForm();
       });
     }
   }
