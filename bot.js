@@ -11,6 +11,7 @@ const bot = new Telegraf(BOT_TOKEN, { handlerTimeout: 9000 });
 
 bot.start(ctx => ctx.reply("Бот запущен. Используй кнопку WebApp или пришли /id, чтобы узнать chat_id."));
 bot.command("id", ctx => ctx.reply(`chat_id: ${ctx.chat.id}`));
+bot.on('channel_post', (ctx) => ctx.reply(`channel chat_id: ${ctx.chat.id}`));
 
 bot.on("message", async (ctx) => {
   const data = ctx.message?.web_app_data?.data;

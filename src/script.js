@@ -108,6 +108,37 @@
 
   // ===== Wiring =====
   function wireCommon() {
+    // 1) Сообщить об ошибке
+    const errorBtn  = document.getElementById("errorBtn");
+    const errorText = document.getElementById("errorText");
+    errorBtn?.addEventListener("click", async () => {
+      const details = (errorText?.value || "").trim();
+      try {
+        tg?.MainButton.setParams({ text: "Отправляем отчёт…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+        const debug = {
+          ts: Date.now(),
+          user: tg?.initDataUnsafe?.user || null,
+          platform: tg?.platform || "",
+          colorScheme: tg?.colorScheme || "",
+          appStep: state.step,
+          selection: state.selection
+        };
+        const res = await fetch(`${BACKEND_URL}/report-error`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tg?.initData || "" },
+          body: JSON.stringify({ details, debug })
+        });
+        if (!res.ok) throw new Error("report failed");
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Спасибо! Отчёт отправлен ✅");
+        if (errorText) errorText.value = "";
+      } catch(e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось отправить отчёт");
+      } finally { tg?.MainButton.hide(); }
+    });
+
     closeBtn?.addEventListener("click", () => tg ? tg.close() : window.close());
 
     backBtn?.addEventListener("click", () => {
@@ -211,16 +242,23 @@
       sCategories.appendChild(el);
     });
 
-    // Админ-панель на главном — Добавить товар
+    // Админ-панель на главном — Добавить услугу
     if (IS_ADMIN) {
       const adminBar = document.createElement("div");
       adminBar.className = "card mt-2";
       adminBar.innerHTML = `
-        <div class="font-semibold">Управление товарами</div>
+        <div class="font-semibold">Управление услугами</div>
         <div class="mt-2">
-          <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить товар</button>
+          <button class="btn btn--pill btn-sm" data-act="addProductForm">Добавить услугу</button>
         </div>`;
       sCategories.appendChild(adminBar);
+
+      adminBar.addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-act]");
+        if (!b) return;
+        e.stopPropagation();
+        if (b.dataset.act === "addProductForm") openAddProductForm();
+      });
     }
   }
 
@@ -326,8 +364,8 @@
     });
     serviceCards.appendChild(general);
 
-    // Админу показываем кнопку добавления товара ТОЛЬКО если карточек услуг нет
-    // Админ-панель снизу: выбор услуги + действия + добавление товара
+    // Админу показываем кнопку добавления услуги ТОЛЬКО если карточек услуг нет
+    // Админ-панель снизу: выбор услуги + действия + добавление услуги
     if (IS_ADMIN) {
       const hasServices = list.length > 0;
       const adminBar = document.createElement("div");
@@ -399,20 +437,38 @@
     }
   }
 
-  async function addPhoto(serviceIdOrProductId) {
+  async function addPhoto(serviceId) {
     if (!IS_ADMIN) return tg?.showAlert?.("Доступно только администратору");
-    // запрос на отправку фото через бота
-    try {
-      const res = await fetch(`${BACKEND_URL}/file?for=${encodeURIComponent(serviceIdOrProductId)}`);
-      const j = await res.json();
-      if (!j?.ok) throw new Error("file link failed");
-      tg?.showAlert?.("Отправьте фото боту в ЛС. Ссылка скопирована.");
-      await navigator.clipboard?.writeText(j.dm || "");
-    } catch (e) {
-      console.warn(e);
-      tg?.showAlert?.("Не удалось подготовить загрузку");
-    }
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.onchange = async () => {
+      const file = inp.files?.[0];
+      if (!file) return;
+      try {
+        tg?.MainButton.setParams({ text: "Загружаем фото…" }); tg?.MainButton.show(); tg?.MainButton.disable();
+        const fd = new FormData();
+        fd.append("photo", file);
+        const res = await fetch(`${BACKEND_URL}/photos/${encodeURIComponent(serviceId)}`, {
+          method: "POST",
+          headers: { "X-Telegram-Init-Data": tg?.initData || "" },
+          body: fd
+        });
+        const j = await res.json().catch(()=>null);
+        if (!res.ok || !j?.ok) throw new Error(j?.error || "upload failed");
+        tg?.HapticFeedback.notificationOccurred("success");
+        tg?.showAlert?.("Фото загружено ✅");
+      } catch(e) {
+        console.warn(e);
+        tg?.HapticFeedback.notificationOccurred("error");
+        tg?.showAlert?.("Не удалось загрузить фото");
+      } finally {
+        tg?.MainButton.hide();
+      }
+    };
+    inp.click();
   }
+
 
   // ===== Админ: правка/удаление услуги =====
   function openEditServiceForm(id) {
@@ -501,7 +557,7 @@
     }
   }
 
-  // ===== Админ: добавить товар =====
+  // ===== Админ: добавить услугу =====
   function openAddProductForm() {
     if (document.getElementById("overlay-add-product")) return;
     const overlay = document.createElement("div");
@@ -509,9 +565,9 @@
     overlay.className = "overlay";
     overlay.innerHTML = `
       <div class="overlay__inner">
-        <div class="font-semibold mb-2">Новый товар</div>
+        <div class="font-semibold mb-2">Новая услуга</div>
         <div class="grid gap-2">
-          <input id="ap_title" class="inp" placeholder="Название товара"/>
+          <input id="ap_title" class="inp" placeholder="Название услуги"/>
           <input id="ap_price" class="inp" placeholder="Цена от, ₽" type="number" min="0" step="1"/>
           <textarea id="ap_desc" class="inp" rows="3" placeholder="Краткое описание"></textarea>
         </div>
@@ -548,13 +604,13 @@
 
         overlay.remove();
         tg?.HapticFeedback.notificationOccurred("success");
-        tg?.showAlert?.("Товар сохранён ✅");
+        tg?.showAlert?.("Услуга сохранена ✅");
         // можно сразу предложить добавить фото:
         // addPhoto(j.item.id);
       } catch (e) {
         console.warn(e);
         tg?.HapticFeedback.notificationOccurred("error");
-        tg?.showAlert?.("Не удалось сохранить товар");
+        tg?.showAlert?.("Не удалось сохранить услугу");
       } finally {
         tg?.MainButton.hide();
       }
@@ -605,6 +661,24 @@
   }
 
   async function onSubmit() {
+    if (tg?.sendData) {
+      tg.sendData(JSON.stringify(payload)); // обработчик у бота уже есть
+    } else {
+      await fetch(`${BACKEND_URL}/web-data`, {  // для dev в браузере
+        method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(payload)
+      });
+    }
+
+    if (tg?.sendData) {
+      tg.sendData(JSON.stringify(payload)); // обработчик в боте уже есть
+    } else {
+      await fetch(`${BACKEND_URL}/web-data`, { // dev в браузере
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    }
+
     if (!validateForm()) {
       if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
       else alert("Заполните имя и телефон.");
