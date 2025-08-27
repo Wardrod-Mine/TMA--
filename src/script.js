@@ -718,11 +718,7 @@
   }
 
   async function onSubmit() {
-    if (!validateForm()) {
-      if (tg?.showAlert) tg.showAlert("Заполните имя и телефон.");
-      else alert("Заполните имя и телефон.");
-      return;
-    }
+    if (!validateForm()) { tg?.showAlert?.("Заполните имя и телефон."); return; }
 
     const payload = {
       type: "lead",
@@ -735,30 +731,32 @@
       name: fName.value.trim(),
       phone: fPhone.value.trim(),
       city: fCity?.value.trim() || "",
-      comment: fComment?.value.trim() || ""
+      comment: fComment?.value.trim() || "",
+      from: tg?.initDataUnsafe?.user || null,   // полезно на бэке
     };
 
     try {
       tg?.MainButton.setParams({ text: "Отправляем…" }); tg?.MainButton.show(); tg?.MainButton.disable();
 
-      if (tg?.sendData) {
-        tg.sendData(JSON.stringify(payload)); // бот примет web_app_data
-      } else {
-        await fetch(`${BACKEND_URL}/web-data`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      }
+      // ➊ в бота (web_app_data)
+      const viaBot = (() => { try { tg?.sendData?.(JSON.stringify(payload)); } catch {} })();
 
-      tg?.HapticFeedback.notificationOccurred("success");
-      tg?.showAlert?.("Заявка отправлена ✅") || alert("Заявка отправлена ✅");
+      // ➋ на бэкенд (резерв)
+      const viaApi = fetch(`${BACKEND_URL}/web-data`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }).catch(()=>{});
+
+      await Promise.race([viaApi, new Promise(r=>setTimeout(r, 600))]); // чуть подождать “для вида”
+
+      tg?.HapticFeedback?.notificationOccurred("success");
+      tg?.showAlert?.("Заявка отправлена ✅");
       [fName, fPhone, fCity, fComment].forEach(el => el && (el.value = ""));
       showScreen("categories");
-    } catch (e) {
-      console.warn(e);
-      tg?.HapticFeedback.notificationOccurred("error");
-      tg?.showAlert?.("Не удалось отправить") || alert("Не удалось отправить");
+    } catch {
+      tg?.HapticFeedback?.notificationOccurred("error");
+      tg?.showAlert?.("Не удалось отправить");
     } finally {
       tg?.MainButton.hide();
     }
