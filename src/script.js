@@ -72,6 +72,7 @@
       const u = tg?.initDataUnsafe?.user;
       if (u) userInfo.textContent = u.username ? `@${u.username}` : (u.first_name || "");
       tg.MainButton.setParams({ text: "Отправить заявку", is_visible: false, is_active: true });
+      tg.MainButton.onClick(onSubmit);
     } else {
       // dev режим
       console.warn("Dev mode: Telegram.WebApp не найден");
