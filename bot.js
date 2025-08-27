@@ -50,7 +50,6 @@ function formatLead(p, from){
     p.city ? `Город: <b>${esc(p.city)}</b>` : null,
     p.comment ? `Комментарий: ${esc(p.comment)}` : null,
     ``,
-    `От: <a href="tg://user?id=${from.id}">${esc(from.username ? '@'+from.username : from.first_name || 'user')}</a>`,
     `Время: ${new Date(p.ts || Date.now()).toLocaleString("ru-RU")}`
   ].filter(Boolean).join('\n');
 }
